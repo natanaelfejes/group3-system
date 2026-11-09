@@ -1,0 +1,24 @@
+# Run with: docker compose up --build
+# The api and web services get added here when their Dockerfiles exist.
+services:
+  simulator:
+    build: ./simulator
+    environment:
+      SIMULATOR_API_KEY: ${SIMULATOR_API_KEY:?copy .env.example to .env and set a key}
+    # Localhost only: the key is in the URL path, so the simulator must never be public.
+    # Other services in this compose file reach it as http://simulator:8000.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - sim-data:/app/data
+    # The simulator saves desk state on Ctrl+C only, so stop it with SIGINT.
+    stop_signal: SIGINT
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,urllib.request as u; u.urlopen('http://localhost:8000/api/v2/%s/desks' % os.environ['SIMULATOR_API_KEY'])"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  sim-data:
