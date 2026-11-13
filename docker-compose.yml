@@ -12,7 +12,9 @@ services:
     volumes:
       - sim-data:/app/data
     # The simulator saves desk state on Ctrl+C only, so stop it with SIGINT.
+    # It needs ~5 s to stop its threads before saving; without the grace period it gets killed first.
     stop_signal: SIGINT
+    stop_grace_period: 30s
     restart: unless-stopped
     # The simulator logs every request URL, key included. Keep the logs small.
     logging:

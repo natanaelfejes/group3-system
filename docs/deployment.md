@@ -15,7 +15,9 @@ Extra simulator options go in `command:` in `docker-compose.yml`, e.g. `["--desk
 
 It's the course's WiFi2BLE simulator, built from a pinned commit (see `simulator/Dockerfile`). It binds to localhost by default, so the Dockerfile patches it to 0.0.0.0.
 
-Desk state lives in memory and is only saved to `data/desks_state.json` on a clean stop (SIGINT, which compose sends). A crash resets the desks.
+Desk state lives in memory and is only saved to `data/desks_state.json` on a clean stop (SIGINT, which compose sends). Saving takes a few seconds, so compose gives it 30 s before killing it. A crash or `docker kill` resets the desks.
+
+By default the simulator also fakes users who move the desks on their own during the simulated day. Add `--no-user-simulation` to `command:` if you want desks to stay where you put them.
 
 The API key is part of the URL, and the simulator logs every request, so the key ends up in `docker logs`. Never expose port 8000 publicly. Only the backend should reach it.
 
