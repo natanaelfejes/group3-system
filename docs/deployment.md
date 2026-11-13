@@ -8,6 +8,8 @@ docker compose up --build
 curl http://localhost:8000/api/v2/<your key>/desks
 ```
 
+The frontend (`web/`) is served on http://localhost:3000.
+
 The backend then uses `SIMULATOR_URL=http://localhost:8000` (as in `backend/backend-README.md`) and the same key.
 Extra simulator options go in `command:` in `docker-compose.yml`, e.g. `["--desks", "10", "--no-user-simulation"]`.
 

@@ -1,5 +1,5 @@
 # Run with: docker compose up --build
-# The api and web services get added here when their Dockerfiles exist.
+# The api service gets added here once the backend has a Dockerfile.
 services:
   simulator:
     build: ./simulator
@@ -19,6 +19,13 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  web:
+    build: ./web
+    # Localhost only for now. Open it up when we deploy.
+    ports:
+      - "127.0.0.1:3000:80"
+    restart: unless-stopped
 
 volumes:
   sim-data:
