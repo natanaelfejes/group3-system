@@ -30,17 +30,18 @@ Prices are from third-party summaries unless noted, so check each provider's pag
 
 | Option | Fits? | Why |
 |---|---|---|
-| **One VPS running `docker compose`** | **Yes, recommended** | Always-on, same compose file as local, we can leave the simulator unexposed, and we choose which ports are open (matters for the Pico W). Hetzner CX23 is about €4/month (aggregator figure, and some sources report new servers temporarily unavailable) |
-| Azure for Students VM | Yes, if everyone qualifies | $100 credit with no card per the Student Pack summaries. Same setup as a VPS. Credit runs out, so put the end date in Jira |
+| **Azure VM (Azure for Students) running `docker compose`** | **Yes, recommended** | A real VPS: always-on, same compose file as local, the simulator stays unexposed, and we choose which ports are open (matters for the Pico W). $100 credit with no card per the Student Pack summaries, and only the account owner needs to qualify. The credit runs out, so the end date goes in the doc |
+| Hetzner VPS | Yes, if Azure falls through | Same setup. CX23 is about €4/month (aggregator figure, and some sources report new servers temporarily unavailable). Needs a card |
+| Google Compute Engine VM | Yes, but a card is needed | Same setup. The $300 free trial lasts 90 days, needs a card, and the account stops after that unless upgraded. This is the standard trial, not a student offer. An always-free e2-micro exists but only in US regions, with about 1 GB RAM |
 | Home server + Cloudflare Tunnel | Fallback | Free, but the demo depends on one person's machine and network |
 | Fly.io | Works | About $2.19/month for a 256 MB machine, no free allowance for new accounts (unconfirmed). Needs a card |
 | Railway | Works | Hobby plan $5/month including $5 of usage |
-| Render free | No | Spins down after 15 minutes without traffic and has no persistent disk, so desks reset |
+| Render free | No | Spins down after 15 minutes without traffic and has no persistent disk, so desks reset. The group also had spin-up and connectivity problems with Render last semester |
 | Google Cloud Run | No | Scale-to-zero resets the desks. Always-on CPU is billed for the whole instance lifetime, and the monthly free allowance covers only about 9% of one always-on vCPU |
 | Vercel | Frontend only | Functions are short-lived (300 s default), so there is nowhere to run a process that keeps ticking. Fine for hosting the React build |
 
 ## Open points for the group
 
 1. **Pico W and TLS.** `backend-README.md` has the Pico call the API over plain HTTP. On a public VPS that means unencrypted traffic, so the API must not rely on a secret that appears in it. Either keep the Pico demo on a local network, or put TLS on the Pico (more firmware work).
-2. **Who pays or owns the VPS account.** One account, credentials in a password manager, not in the repo.
-3. **End date.** Delete the server after the exam.
+2. **Who owns the VPS account.** One account, credentials in a password manager, not in the repo.
+3. **End date.** Delete the server after the exam, and write the date here when the VM is created.
