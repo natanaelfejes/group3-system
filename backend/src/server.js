@@ -1,11 +1,12 @@
 import express from 'express';
 import { desksRouter } from './routes/desks.js';
-import { listDeskIds, SimulatorError } from './simulator/client.js';
+import { listDeskIds, SimulatorError } from './services/deskSimulatorClient.js';
 
 // ===== Settings (from .env) =====
 const PORT = Number(process.env.PORT ?? 3000);
-// IMPORTANT: 0.0.0.0 lets the Pico W connect over Wi-Fi. 127.0.0.1 would only allow this computer.
-const HOST = process.env.HOST ?? '0.0.0.0';
+// IMPORTANT: 127.0.0.1 only allows this computer (safe default, there is no auth yet).
+// Set HOST=0.0.0.0 in .env to let the Pico W connect over Wi-Fi.
+const HOST = process.env.HOST ?? '127.0.0.1';
 
 const app = express();
 app.use(express.json()); // lets us read JSON sent in requests
@@ -53,6 +54,14 @@ app.use((err, _req, res, _next) => {
 
 // ===== Start the server =====
 app.listen(PORT, HOST, (error) => {
-  if (error) throw error;
+  if (error) {
+    // IMPORTANT: "fail fast" = if the server can't start, stop right away instead of
+    // running half-broken. We print a clear reason first, so it's easy to fix. Common ones:
+    //   EADDRINUSE    = something else already uses this port (change PORT in .env)
+    //   EADDRNOTAVAIL = HOST in .env is not an address of this computer
+    // process.exit(1) stops the program; 1 means "ended with an error" (0 would mean success).
+    console.error(`Could not start the API on ${HOST}:${PORT}: ${error.message}`);
+    process.exit(1);
+  }
   console.log(`API listening on http://${HOST}:${PORT}`);
 });

@@ -1,4 +1,7 @@
 // ===== Functions for talking to the desk simulator =====
+// "Simulator" = the WiFi2BLE box simulator, which pretends to be the real desks for us.
+// The rest of the backend uses these functions instead of calling the simulator directly.
+// Every failed call throws a SimulatorError (below), so callers get one kind of error to handle.
 // Simulator: https://source.coderefinery.org/sdm-edu/wifi2ble-box-simulator
 //
 // One desk from the simulator looks like this:
@@ -22,6 +25,10 @@ const DESKS_URL = `${SIMULATOR_URL}/api/v2/${API_KEY}/desks`;
 
 // Desk ids look like "cd:fb:1a:53:fb:e6"
 const DESK_ID_PATTERN = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i;
+
+// Height limits of the simulated desks, in mm
+const MIN_POSITION_MM = 680;
+const MAX_POSITION_MM = 1320;
 
 // Error we throw when a simulator call fails.
 // status = the simulator's status code, or null if the simulator is not running.
@@ -69,11 +76,12 @@ export async function getDeskErrors(deskId) {
 
 // IMPORTANT: moves a desk to a height in mm.
 // - The desk moves slowly (32 mm per second). Check getDeskState() until speed_mms is 0.
-// - The simulator only allows 680-1320 mm. Anything else gets changed to the closest limit.
-// - Returns the height the simulator actually accepted.
+// - Only 680-1320 mm is allowed. The simulator would silently clamp other values,
+//   so we reject them instead (400), so the caller knows it sent something wrong.
+// - Returns the height the simulator accepted.
 export async function setDeskPosition(deskId, positionMm) {
-  if (!Number.isInteger(positionMm)) {
-    throw new RangeError('position_mm must be a whole number of millimetres, e.g. {"position_mm": 1000}');
+  if (!Number.isInteger(positionMm) || positionMm < MIN_POSITION_MM || positionMm > MAX_POSITION_MM) {
+    throw new RangeError(`position_mm must be a whole number from ${MIN_POSITION_MM} to ${MAX_POSITION_MM}, e.g. {"position_mm": 1000}`);
   }
   const result = await request('PUT', `${deskPath(deskId)}/state`, { position_mm: positionMm });
   return result.position_mm;

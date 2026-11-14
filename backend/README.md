@@ -22,8 +22,9 @@ Requires Node.js 22.9 or newer, and Python 3 for the simulator.
    PORT=3000
    HOST=0.0.0.0
    SIMULATOR_URL=http://localhost:8000
-   SIMULATOR_API_KEY=E9Y2LxT4g1hQZ7aD8nR3mWx5P0qK6pV7
+   SIMULATOR_API_KEY=<your simulator API key>
    ```
+   Get the API key from the simulator repo. `HOST=0.0.0.0` lets the Pico W connect over Wi-Fi; leave it out to only allow this computer (`127.0.0.1`, the default).
 3. Start the API (in `backend/`):
    ```bash
    npm install
@@ -50,14 +51,14 @@ Errors are always JSON: `{"error": "..."}`.
 
 | Status | Meaning |
 |---|---|
-| 400 | Bad desk id, or bad body (`position_mm` must be a whole number, `Content-Type: application/json`) |
+| 400 | Bad desk id, or bad body (`position_mm` must be a whole number from 680 to 1320, `Content-Type: application/json`) |
 | 404 | Desk not found, or it is powered off (the simulator powers desks off at random) |
 | 502 | The simulator rejected the request, e.g. wrong `SIMULATOR_API_KEY` (the message says which) |
 | 503 | The simulator is not running or not reachable |
 
 ### Moving a desk
 
-`PUT .../position` returns immediately. The desk then moves about 32 mm per second, so poll `GET .../state` to follow it: `speed_mms` is positive going up, negative going down, and 0 when it has stopped. The simulator limits positions to 680–1320 mm. If you ask for more or less, it moves to the nearest limit, and the response tells you which target it accepted.
+`PUT .../position` returns immediately. The desk then moves about 32 mm per second, so poll `GET .../state` to follow it: `speed_mms` is positive going up, negative going down, and 0 when it has stopped. Positions must be 680–1320 mm (the simulator's limits). Anything outside that range gets a 400.
 
 ## Calling it from the Pico W
 
@@ -78,7 +79,7 @@ Errors are always JSON: `{"error": "..."}`.
 
 | File | What it does |
 |---|---|
-| `src/simulator/client.js` | One function per simulator call: `listDeskIds`, `getDesk`, `getDeskState`, `getDeskConfig`, `getDeskUsage`, `getDeskErrors`, `setDeskPosition`. Import these from any backend code that needs desks. |
+| `src/services/deskSimulatorClient.js` | One function per simulator call: `listDeskIds`, `getDesk`, `getDeskState`, `getDeskConfig`, `getDeskUsage`, `getDeskErrors`, `setDeskPosition`. Import these from any backend code that needs desks. |
 | `src/routes/desks.js` | The `/api/desks` endpoints |
 | `src/server.js` | Entry point: Express app, `/api/health`, turns errors into HTTP status codes |
 
