@@ -40,6 +40,7 @@ docker buildx build --platform linux/amd64 -t group3-simulator:prod --load ./sim
 docker save group3-web:prod group3-simulator:prod | gzip | ssh azureuser@<ip> 'gunzip | sudo docker load'
 ```
 
+- `scripts/deploy.sh` does the build, ship and restart in one go: `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh`. There is no CI deploy. Only this repo is deployed, the VM can't build, and CI would need an SSH key as a repo secret.
 - On the VM, `~/group3/` holds `docker-compose.yml`, `docker-compose.prod.yml` and a `.env` with its own `SIMULATOR_API_KEY` (not the same as anyone's local one):
 
 ```bash
