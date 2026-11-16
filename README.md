@@ -2,7 +2,9 @@
 
 Part of the Group 3 semester project: a management system for Linak motorized desks (distributed system with embedded elements).
 
-This repo holds the web app, the API and the desk simulator setup. The Pico W firmware is in [group3-embedded](https://github.com/natanaelfejes/group3-embedded).
+Web app and API for the desk system.
+
+Stack: Node.js (JavaScript) backend, React + TypeScript frontend, PostgreSQL on Supabase, Docker, GitHub Actions. The Pico W firmware (C++) lives in its own repo.
 
 Stack: React + TypeScript (Vite) in `web/`, Node + Express in `backend/`, PostgreSQL on Supabase, Docker Compose to run it all.
 
