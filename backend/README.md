@@ -10,27 +10,20 @@ Pico W / web app  --HTTP-->  this API (:3000)  --HTTP-->  simulator (:8000, loca
 
 ## Running it
 
-Requires Node.js 22.9 or newer, and Python 3 for the simulator.
+Easiest: `docker compose up --build` in the repo root runs the simulator, this API and the web app (see [docs/deployment.md](../docs/deployment.md)). The API is then on http://localhost:3000.
 
-1. Start the simulator in HTTP mode (in the simulator repo):
-   ```bash
-   python simulator/main.py --port 8000
+To work on the backend with auto-restart instead:
+
+1. Start only the simulator (repo root): `docker compose up simulator`. Leave the `api` container off, it uses port 3000 too.
+2. Create `backend/.env` (not in git):
    ```
-   Add `--no-user-simulation` if you don't want the simulated users moving the desks while you test.
-2. Create `backend/.env`. It's not in git (`.gitignore` skips it), so everyone makes their own:
-   ```
-   PORT=3000
-   HOST=0.0.0.0
    SIMULATOR_URL=http://localhost:8000
-   SIMULATOR_API_KEY=<your simulator API key>
+   SIMULATOR_API_KEY=<same key as SIMULATOR_API_KEY in the root .env>
    ```
-   Get the API key from the simulator repo. `HOST=0.0.0.0` lets the Pico W connect over Wi-Fi; leave it out to only allow this computer (`127.0.0.1`, the default).
-3. Start the API (in `backend/`):
-   ```bash
-   npm install
-   npm run dev              # restarts on file changes; use `npm start` otherwise
-   ```
-4. Check it: open http://localhost:3000/api/health. It should show `{"api":"ok","simulator":"ok"}`.
+3. In `backend/`: `npm install`, then `npm run dev`.
+4. Check http://localhost:3000/api/health. It should show `{"api":"ok","simulator":"ok"}`.
+
+Requires Node.js 22.9 or newer.
 
 ## Endpoints
 
@@ -62,18 +55,7 @@ Errors are always JSON: `{"error": "..."}`.
 
 ## Calling it from the Pico W
 
-- Use `http://<IP of the machine running the API>:3000`. On Windows, run `ipconfig` and use the IPv4 address. The Pico must be on the same network.
-- The first time the API starts, Windows asks whether to let Node.js through the firewall. Allow it on private networks.
-- Plain HTTP only, so the Pico needs no TLS.
-- Example request:
-  ```http
-  PUT /api/desks/cd:fb:1a:53:fb:e6/position HTTP/1.1
-  Host: 192.168.1.50:3000
-  Content-Type: application/json
-  Content-Length: 19
-
-  {"position_mm":900}
-  ```
+The Pico calls the deployed backend through port 80: `http://4.233.89.145/api/...`. Exact requests, errors and firmware notes are in [docs/pico-api.md](../docs/pico-api.md). Never call the simulator directly, its key would end up in the firmware.
 
 ## Code layout
 

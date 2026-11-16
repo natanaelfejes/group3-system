@@ -43,20 +43,28 @@ Render free and Cloud Run sleep when idle, which means slow first requests and r
 Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploys by itself. The deploy job runs `scripts/deploy.sh` on the GitHub runner, then checks that `http://<ip>/api/health` answers. Pushes that only change `*.md` or `docs/` don't trigger CI.
 
 - By hand: Run workflow on main in the Actions tab, or `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh` from a laptop with Docker.
-- Rollback: revert the commit on `main` and it redeploys. If the commit only touched docs, use Run workflow instead.
+- Rollback: revert the commit on `main` (through a PR) and it redeploys.
 - Every deploy recreates all containers. The simulator saves its desks on stop, but expect a blip of about 20 s. Before a demo or the exam, disable the workflow in the Actions tab if you don't want that.
 
-The deploy job runs in the GitHub environment `production`, which only `main` can use. It has three environment secrets (not repo secrets): `VM_HOST`, `VM_SSH_KEY` and `VM_KNOWN_HOSTS`. For the last one use `ssh-keyscan -t ed25519 <ip>`, or read `/etc/ssh/ssh_host_ed25519_key.pub` on the VM.
+The deploy job runs in the GitHub environment `production`, which only `main` can use. It has three environment secrets (not repo secrets): `VM_HOST`, `VM_SSH_KEY` and `VM_KNOWN_HOSTS`. For the last one use the output of `ssh-keyscan -t ed25519 <ip>`.
 
-`VM_SSH_KEY` is separate from the admin key, but it's not a weak one: `azureuser` has `sudo docker`, so it's root on the VM. Anyone who can push to `main` can deploy.
+`VM_SSH_KEY` is separate from the admin key, but it's not a weak one: `azureuser` has `sudo docker`, so it's root on the VM. A merged change to `ci.yml` could send the key anywhere, so `.github/` and `scripts/` changes always get a review (see CONTRIBUTING.md), even though GitHub lets you merge your own PR.
 
 ### CI on every PR
 
 - web: lint and build
 - backend: install and syntax check
-- stack: checks the prod compose file, runs `docker compose up --build --wait` with a throwaway key, then expects 200 on web, 200 on `/api/health` through web and 404 for an unknown desk
+- stack: checks that the prod compose file parses (it doesn't run it), runs `docker compose up --build --wait` with a throwaway key, then expects 200 on web, 200 on `/api/health` through web, 404 for an unknown desk and a working Pico PUT
 
 `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there. Deploy waits for all three.
+
+### Adding a secret (database, login, ...)
+
+1. Add it to the `api` service's `environment:` in `docker-compose.yml`, e.g. `DATABASE_URL: ${DATABASE_URL:?}`.
+2. Put a dummy value in the `stack` job's `env:` in `ci.yml`, or CI fails.
+3. Add it to `.env.example` with no real value, and to your own `.env`.
+4. Ask the VM owner to add the real one to `~/group3/.env` before the PR merges, or the deploy fails.
+5. Real values go in the password manager, never in the repo or Discord.
 
 ### SSH access
 
@@ -79,8 +87,10 @@ Checked on 2026-11-15: web returns 200 from outside, port 8000 isn't reachable f
 
 - `/api` is public and has no auth, `PUT .../position` included. It only controls simulated desks. We need auth before the backend controls a real desk, since a moving desk is a physical safety risk.
 - SSH is open to the world, key only.
-- Every key in `authorized_keys` and everyone who can push to `main` is effectively root on the VM.
-- nginx limits `/api/` to 10 requests per second per IP (burst 20). That slows abuse a bit and doesn't replace auth.
+- Every key in `authorized_keys` and everyone who can merge to `main` is effectively root on the VM.
+- nginx limits `/api/` to 10 requests per second per IP (burst 20), then answers 429. That slows abuse a bit and doesn't replace auth. Everyone on SDU Wi-Fi probably shares one IP, so if the demo hits 429s, raise it in `web/nginx.conf`.
+- Base images (`node`, `nginx`, `python`) aren't pinned to a digest and every deploy rebuilds them, so a deploy can pick up a newer patch version than CI tested. Each deploy also clones the simulator from source.coderefinery.org, so if that's down, the deploy fails. Rerun it later.
+- No memory limits on the containers. If the 1 GB VM runs out, check `sudo docker stats` first.
 
 ## Open points
 

@@ -1,6 +1,6 @@
 # What the Pico sends
 
-The Pico talks to the backend through web on port 80, the same way the browser does. CI sends this exact request on every PR (`stack` job), so if it breaks, the PR goes red.
+The Pico talks to the backend through web on port 80, the same way the browser does. CI sends the same PUT on every PR (`stack` job, first desk from `/api/desks`), so if it breaks, the PR goes red.
 
 ## Move a desk
 
@@ -44,8 +44,8 @@ The return button should go back to the height the user saved, not a value hardc
 |---|---|
 | 400 | Bad desk id, `position_mm` out of range, or broken JSON |
 | 404 | Desk doesn't exist or is powered off |
+| 429 | Too many requests, slow down (see below) |
 | 502, 503 | Simulator error or simulator down. Retry later. |
-| 503 from nginx | Rate limit hit (see below) |
 
 ## Things to know on the firmware side
 

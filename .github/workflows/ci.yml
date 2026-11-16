@@ -23,8 +23,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -40,8 +40,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -55,7 +55,8 @@ jobs:
     env:
       SIMULATOR_API_KEY: ci0throwaway0key
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Only checks that the prod override parses. The port 80 mapping is first really used by deploy.
       - run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
       - run: docker compose up -d --build --wait --wait-timeout 180
       - name: Web answers
@@ -80,7 +81,7 @@ jobs:
     # The three VM secrets are environment secrets, only available on main.
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Set up SSH
         env:
           VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
