@@ -44,20 +44,34 @@ docker save group3-web:prod group3-simulator:prod group3-api:prod | gzip | ssh a
 ```
 
 - Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploys by itself. The deploy job runs `scripts/deploy.sh` on the GitHub runner (it builds the images, the VM can't). You can also redeploy from the Actions tab (Run workflow on main), or by hand: `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh`.
-- The workflow needs three repo secrets: `VM_HOST`, `VM_SSH_KEY` (a deploy-only key, separate from the admin key) and `VM_KNOWN_HOSTS`. If the VM is recreated, set all three again.
-- CI on every PR: web lint and build, backend install and syntax check, `docker compose config` for both compose files, and a `stack` job that runs `docker compose up --build` with a throwaway key and checks web (200), `/api/health` through web (200) and an unknown desk (404). Deploy needs all of them. `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there.
+- The deploy job runs in the GitHub environment `production`, limited to the `main` branch. It needs three environment secrets there (not repo secrets): `VM_HOST`, `VM_SSH_KEY` and `VM_KNOWN_HOSTS`. `VM_KNOWN_HOSTS` is the VM's host key line: `ssh-keyscan -t ed25519 <ip>` (or read `/etc/ssh/ssh_host_ed25519_key.pub` on the VM). Pushes that only change `*.md` or `docs/` do not trigger CI.
+- `VM_SSH_KEY` is a separate key from the admin one, but not a weak one: `azureuser` has `sudo docker`, so it is root on the VM. Treat the key that way. Anyone who can push to `main` can deploy.
+- Rollback: revert the commit on `main`, which redeploys. Every deploy recreates all containers, so the simulator blips for about 20 s (desks are saved on stop). Before a demo or the exam, disable the workflow in the Actions tab if you don't want that.
+- CI on every PR: web lint and build, backend install and syntax check, and a `stack` job that checks `docker compose config` for the prod file, runs `docker compose up --build --wait` with a throwaway key, and checks web (200), `/api/health` through web (200) and an unknown desk (404). Deploy needs web, backend and stack. After deploying, the job checks `http://<ip>/api/health`. `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there.
 - On the VM, `~/group3/` holds `docker-compose.yml`, `docker-compose.prod.yml` and a `.env` with its own `SIMULATOR_API_KEY` (not the same as anyone's local one):
 
 ```bash
 sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
 ```
 
+- Rebuilding the VM:
+  1. Create it (region policy notes below), install Docker, add 2 GB swap.
+  2. Create `~/group3/.env` with a fresh `SIMULATOR_API_KEY` (`chmod 600`, never a key from the README or defaults).
+  3. Add the deploy public key to `~/.ssh/authorized_keys` and open port 80.
+  4. Set the three environment secrets again.
 - To get SSH access, send your public key to the owner, who appends it to `~/.ssh/authorized_keys` on the VM.
 - Gotchas: the subscription only allows norwayeast, polandcentral, switzerlandnorth, italynorth and francecentral (policy), and the new VM wizard hides them, so use the "previous experience" wizard. Availability zone 1 hides the B-series, so pick "no infrastructure redundancy".
 - Tested on 2026-11-15: web returns 200 from outside, port 8000 is not reachable from outside, simulator is healthy, right key 200 and wrong key 401, and desk state is written to the volume on `docker compose stop`.
 - The backend has no auth. Through web on port 80, `/api` is public, including `PUT .../position`.
 
+## Accepted risks
+
+- `/api` is public and has no auth. It only controls simulated desks. Auth is required before the backend controls any real desk, because a moving desk is a physical safety risk.
+- SSH is open to the world, key-only.
+- Every key in `authorized_keys` and everyone who can push to `main` is effectively root on the VM.
+- nginx rate limits `/api/` to 10 requests per second per IP (burst 20). That slows abuse a little and does not replace auth.
+
 ## Open points
 
-1. The Pico needs the API reachable from outside. Port 80 works through the web proxy (`http://<ip>/api/...`), or we publish 3000 on the VM and open it in the NSG. The Pico calls the API over plain HTTP, but the traffic is not encrypted, so don't put anything real in it. TLS in the firmware is the proper fix.
+1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`). That is plain HTTP, so the traffic is not encrypted, so don't put anything real in it. TLS in the firmware is the proper fix.
 2. Credentials stay in a password manager, not the repo.
