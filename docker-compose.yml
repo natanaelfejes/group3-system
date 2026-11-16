@@ -1,5 +1,5 @@
 # Run with: docker compose up --build
-# The api and web services get added here when their Dockerfiles exist.
+# The api service gets added here once the backend has a Dockerfile.
 services:
   simulator:
     build: ./simulator
@@ -12,13 +12,27 @@ services:
     volumes:
       - sim-data:/app/data
     # The simulator saves desk state on Ctrl+C only, so stop it with SIGINT.
+    # It needs ~5 s to stop its threads before saving; without the grace period it gets killed first.
     stop_signal: SIGINT
+    stop_grace_period: 30s
     restart: unless-stopped
+    # The simulator logs every request URL, key included. Keep the logs small.
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "2"
     healthcheck:
       test: ["CMD", "python", "-c", "import os,urllib.request as u; u.urlopen('http://localhost:8000/api/v2/%s/desks' % os.environ['SIMULATOR_API_KEY'])"]
       interval: 15s
       timeout: 5s
       retries: 3
+
+  web:
+    build: ./web
+    # 3000 is the backend's port, so the frontend uses 8081.
+    ports:
+      - "127.0.0.1:8081:80"
+    restart: unless-stopped
 
 volumes:
   sim-data:
