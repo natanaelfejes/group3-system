@@ -14,7 +14,7 @@ Easiest: `docker compose up --build` in the repo root runs the simulator, this A
 
 To work on the backend with auto-restart instead:
 
-1. Start only the simulator (repo root): `docker compose up simulator`. Leave the `api` container off, it uses port 3000 too.
+1. Start only the simulator (repo root, needs the root `.env` with `SIMULATOR_API_KEY`): `docker compose up simulator`. Leave the `api` container off, it uses port 3000 too.
 2. Create `backend/.env` (not in git):
    ```
    SIMULATOR_URL=http://localhost:8000

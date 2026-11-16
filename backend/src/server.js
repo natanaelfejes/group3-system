@@ -9,7 +9,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '127.0.0.1';
 
 const app = express();
-app.set('trust proxy', 1); // behind nginx (or the Vite proxy), so req.ip is the real client
+app.set('trust proxy', 1); // behind nginx in compose, so req.ip is the real client (nginx sets X-Forwarded-For)
 app.use(express.json()); // lets us read JSON sent in requests
 
 // ===== Routes =====
