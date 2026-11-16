@@ -73,5 +73,5 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-
 
 ## Open points
 
-1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`). That is plain HTTP, so the traffic is not encrypted, so don't put anything real in it. TLS in the firmware is the proper fix.
+1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`). That is plain HTTP, so nothing is encrypted. Don't put anything real in it. TLS in the firmware is the proper fix.
 2. Credentials stay in a password manager, not the repo.
