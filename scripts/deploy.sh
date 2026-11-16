@@ -7,6 +7,9 @@ set -euo pipefail
 SSH=(ssh ${KEY:+-i "$KEY"} "$VM")
 cd "$(dirname "$0")/.."
 
+# The runner has no build cache, so every deploy makes new images and recreates all containers, the simulator too.
+# The simulator is stopped with SIGINT, so desk state is saved and survives, but expect a blip of about 20 s.
+
 docker buildx build --platform linux/amd64 -t group3-web:prod --load ./web
 docker buildx build --platform linux/amd64 -t group3-simulator:prod --load ./simulator
 docker buildx build --platform linux/amd64 -t group3-api:prod --load ./backend
@@ -17,5 +20,3 @@ scp ${KEY:+-i "$KEY"} docker-compose.yml docker-compose.prod.yml "$VM:~/group3/"
 # --wait fails the deploy if a container does not become healthy.
 "${SSH[@]}" 'cd ~/group3 && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --wait'
 "${SSH[@]}" 'sudo docker image prune -f'
-# The runner has no build cache, so every deploy makes new images and recreates all containers, the simulator too.
-# The simulator is stopped with SIGINT, so desk state is saved and survives, but expect a blip of about 20 s.
