@@ -8,70 +8,81 @@ docker compose up --build
 curl http://localhost:8081/api/health
 ```
 
-One command starts the simulator, the backend (`api`) and the frontend. The frontend is on http://localhost:8081, the backend on http://localhost:3000 and the simulator on http://localhost:8000 (all localhost only). The key lives in the root `.env`; compose passes the same one to the simulator and the backend, which reaches the simulator as `http://simulator:8000`.
+That starts the simulator, the backend (`api`) and the frontend. Web is on http://localhost:8081, the backend on :3000 and the simulator on :8000, all localhost only. The key lives in the root `.env` and compose gives the same one to the simulator and the backend.
 
-`/api/` on port 8081 is proxied by nginx (`web/nginx.conf`) to the backend, so the browser only talks to one origin, like the Vite dev proxy. Other paths fall back to `index.html`.
+nginx (`web/nginx.conf`) proxies `/api/` to the backend, so the browser only talks to one origin, like the Vite dev proxy. Every other path falls back to `index.html`.
+
 Extra simulator options go in `command:` in `docker-compose.yml`, e.g. `["--desks", "10", "--no-user-simulation"]`.
 
-## What to know about the simulator
+## The simulator
 
 It's the course's WiFi2BLE simulator, built from a pinned commit (see `simulator/Dockerfile`). It binds to localhost by default, so the Dockerfile patches it to 0.0.0.0.
 
 Desk state lives in memory and is only saved to `data/desks_state.json` on a clean stop (SIGINT, which compose sends). Saving takes a few seconds, so compose gives it 30 s before killing it. A crash or `docker kill` resets the desks.
 
-By default the simulator also fakes users who move the desks on their own during the simulated day. Add `--no-user-simulation` to `command:` if you want desks to stay where you put them.
+It also fakes users who move the desks on their own during the simulated day. Add `--no-user-simulation` if you want desks to stay where you put them.
 
-The API key is part of the URL, and the simulator logs every request, so the key ends up in `docker logs`. Never expose port 8000 publicly. Only the backend should reach it.
+The API key is part of the URL and the simulator logs every request, so the key ends up in `docker logs`. Never expose port 8000. Only the backend talks to it.
 
 ## Hosting
 
-We run this compose file on an Azure VM paid from the Azure for Students credit. It's a normal VPS: always on, the same setup as locally, and we decide which ports are open, which matters for the Pico.
+We run this compose file on an Azure VM, paid from the Azure for Students credit. It's a normal VPS: always on, same setup as locally, and we decide which ports are open, which matters for the Pico.
 
-Render free and Cloud Run sleep or scale to zero when idle, which means slow first requests and reset desks. We also had spin-up and connection problems with Render last semester.
+Render free and Cloud Run sleep when idle, which means slow first requests and reset desks. We also had spin-up and connection problems with Render last semester.
 
 ### The VM
 
-- Created 2026-11-15, France Central, Standard B2ats_v2 (2 vCPU, 1 GB RAM), Ubuntu, resource group `group3-vm_group`. Public IP 4.233.89.145.
-- Owner: Natanael (SDU Azure for Students subscription). Delete it after the exam, planned for the end of the semester (confirm the date once the exam is scheduled), by deleting the resource group.
-- Port 80 is open to everyone (web). 22 is key-only SSH. The simulator and the backend are not public: they listen on 127.0.0.1:8000 and 127.0.0.1:3000 on the VM only, and web proxies `/api` to the backend.
-- It has 2 GB swap because 1 GB RAM is tight. Never build images on the VM. Build for `linux/amd64` on a laptop and load them:
+- Created 2026-11-15 in France Central. Standard B2ats_v2 (2 vCPU, 1 GB RAM), Ubuntu, resource group `group3-vm_group`, public IP 4.233.89.145.
+- It has 2 GB swap because 1 GB RAM is tight, and it can't build images. They're built for `linux/amd64` on the GitHub runner (or your laptop) and loaded over SSH.
+- Port 80 is open to everyone and serves web. Port 22 is SSH, key only. The simulator and the backend only listen on 127.0.0.1 on the VM (:8000 and :3000), web proxies `/api` to the backend.
+- Owner: Natanael (SDU Azure for Students subscription). Delete it after the exam by deleting the resource group. Planned for the end of the semester, we'll write the date here once the exam is scheduled.
+- `~/group3/` on the VM holds `docker-compose.yml`, `docker-compose.prod.yml` and a `.env` with its own `SIMULATOR_API_KEY`, not the same as anyone's local one.
 
-```bash
-docker buildx build --platform linux/amd64 -t group3-web:prod --load ./web
-docker buildx build --platform linux/amd64 -t group3-simulator:prod --load ./simulator
-docker buildx build --platform linux/amd64 -t group3-api:prod --load ./backend
-docker save group3-web:prod group3-simulator:prod group3-api:prod | gzip | ssh azureuser@<ip> 'gunzip | sudo docker load'
-```
+### Deploying
 
-- Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploys by itself. The deploy job runs `scripts/deploy.sh` on the GitHub runner (it builds the images, the VM can't). You can also redeploy from the Actions tab (Run workflow on main), or by hand: `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh`.
-- The deploy job runs in the GitHub environment `production`, limited to the `main` branch. It needs three environment secrets there (not repo secrets): `VM_HOST`, `VM_SSH_KEY` and `VM_KNOWN_HOSTS`. `VM_KNOWN_HOSTS` is the VM's host key line: `ssh-keyscan -t ed25519 <ip>` (or read `/etc/ssh/ssh_host_ed25519_key.pub` on the VM). Pushes that only change `*.md` or `docs/` do not trigger CI.
-- `VM_SSH_KEY` is a separate key from the admin one, but not a weak one: `azureuser` has `sudo docker`, so it is root on the VM. Treat the key that way. Anyone who can push to `main` can deploy.
-- Rollback: revert the commit on `main`, which redeploys (if the reverted commit only touched docs, use Run workflow in the Actions tab instead, because docs-only pushes don't deploy). Every deploy recreates all containers, so the simulator blips for about 20 s (desks are saved on stop). Before a demo or the exam, disable the workflow in the Actions tab if you don't want that.
-- CI on every PR: web lint and build, backend install and syntax check, and a `stack` job that checks `docker compose config` for the prod file, runs `docker compose up --build --wait` with a throwaway key, and checks web (200), `/api/health` through web (200) and an unknown desk (404). Deploy needs web, backend and stack. After deploying, the job checks `http://<ip>/api/health`. `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there.
-- On the VM, `~/group3/` holds `docker-compose.yml`, `docker-compose.prod.yml` and a `.env` with its own `SIMULATOR_API_KEY` (not the same as anyone's local one):
+Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploys by itself. The deploy job runs `scripts/deploy.sh` on the GitHub runner, then checks that `http://<ip>/api/health` answers. Pushes that only change `*.md` or `docs/` don't trigger CI.
 
-```bash
-sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
-```
+- By hand: Run workflow on main in the Actions tab, or `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh` from a laptop with Docker.
+- Rollback: revert the commit on `main` and it redeploys. If the commit only touched docs, use Run workflow instead.
+- Every deploy recreates all containers. The simulator saves its desks on stop, but expect a blip of about 20 s. Before a demo or the exam, disable the workflow in the Actions tab if you don't want that.
 
-- Rebuilding the VM:
-  1. Create it (region policy notes below), install Docker, add 2 GB swap.
-  2. Create `~/group3/.env` with a fresh `SIMULATOR_API_KEY` (`chmod 600`, never a key from the README or defaults).
-  3. Add the deploy public key to `~/.ssh/authorized_keys` and open port 80.
-  4. Set the three environment secrets again.
-- To get SSH access, send your public key to the owner, who appends it to `~/.ssh/authorized_keys` on the VM.
-- Gotchas: the subscription only allows norwayeast, polandcentral, switzerlandnorth, italynorth and francecentral (policy), and the new VM wizard hides them, so use the "previous experience" wizard. Availability zone 1 hides the B-series, so pick "no infrastructure redundancy".
-- Tested on 2026-11-15: web returns 200 from outside, port 8000 is not reachable from outside, simulator is healthy, right key 200 and wrong key 401, and desk state is written to the volume on `docker compose stop`.
-- The backend has no auth. Through web on port 80, `/api` is public, including `PUT .../position`.
+The deploy job runs in the GitHub environment `production`, which only `main` can use. It has three environment secrets (not repo secrets): `VM_HOST`, `VM_SSH_KEY` and `VM_KNOWN_HOSTS`. For the last one use `ssh-keyscan -t ed25519 <ip>`, or read `/etc/ssh/ssh_host_ed25519_key.pub` on the VM.
 
-## Accepted risks
+`VM_SSH_KEY` is separate from the admin key, but it's not a weak one: `azureuser` has `sudo docker`, so it's root on the VM. Anyone who can push to `main` can deploy.
 
-- `/api` is public and has no auth. It only controls simulated desks. Auth is required before the backend controls any real desk, because a moving desk is a physical safety risk.
-- SSH is open to the world, key-only.
+### CI on every PR
+
+- web: lint and build
+- backend: install and syntax check
+- stack: checks the prod compose file, runs `docker compose up --build --wait` with a throwaway key, then expects 200 on web, 200 on `/api/health` through web and 404 for an unknown desk
+
+`npm test` runs in `web/` and `backend/` as soon as a `test` script exists there. Deploy waits for all three.
+
+### SSH access
+
+Send your public key to the owner, who adds it to `~/.ssh/authorized_keys` on the VM. You only need it to read logs (`sudo docker compose logs`), deploys don't need it.
+
+### Rebuilding the VM
+
+1. Create it (see the gotchas below), install Docker, add 2 GB swap.
+2. Create `~/group3/.env` with a fresh `SIMULATOR_API_KEY`, `chmod 600`. Not one from the README.
+3. Add the deploy public key to `~/.ssh/authorized_keys` and open port 80.
+4. Set the three environment secrets again.
+
+### Azure gotchas
+
+The subscription only allows norwayeast, polandcentral, switzerlandnorth, italynorth and francecentral (policy), and the new VM wizard hides them, so use the "previous experience" wizard. Availability zone 1 hides the B-series, so pick "no infrastructure redundancy".
+
+Checked on 2026-11-15: web returns 200 from outside, port 8000 isn't reachable from outside, simulator healthy, right key 200 and wrong key 401, and desk state survives a stop/start and a VM reboot.
+
+## Risks we accepted
+
+- `/api` is public and has no auth, `PUT .../position` included. It only controls simulated desks. We need auth before the backend controls a real desk, since a moving desk is a physical safety risk.
+- SSH is open to the world, key only.
 - Every key in `authorized_keys` and everyone who can push to `main` is effectively root on the VM.
-- nginx rate limits `/api/` to 10 requests per second per IP (burst 20). That slows abuse a little and does not replace auth.
+- nginx limits `/api/` to 10 requests per second per IP (burst 20). That slows abuse a bit and doesn't replace auth.
 
 ## Open points
 
-1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`). That is plain HTTP, so nothing is encrypted. Don't put anything real in it. TLS in the firmware is the proper fix.
-2. Credentials stay in a password manager, not the repo.
+1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`). That's plain HTTP, so nothing is encrypted, don't send anything real. TLS in the firmware is the proper fix.
+2. Credentials go in a password manager, not the repo.
