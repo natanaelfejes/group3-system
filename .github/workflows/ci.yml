@@ -1,0 +1,78 @@
+# Checks run on every PR and on main. A push to main that passes them also deploys to the Azure VM.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: # manual redeploy from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test --if-present
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: find src -name '*.js' -exec node --check {} +
+      - run: npm test --if-present
+
+  compose:
+    runs-on: ubuntu-latest
+    env:
+      SIMULATOR_API_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config -q
+      - run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+
+  deploy:
+    needs: [web, backend, compose]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    env:
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+      VM_KNOWN_HOSTS: ${{ secrets.VM_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy
+        run: VM="azureuser@$VM_HOST" KEY=~/.ssh/deploy_key scripts/deploy.sh
+      - name: Check the site answers
+        run: curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-connrefused -o /dev/null "http://$VM_HOST/"

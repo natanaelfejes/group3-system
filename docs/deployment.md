@@ -40,7 +40,9 @@ docker buildx build --platform linux/amd64 -t group3-simulator:prod --load ./sim
 docker save group3-web:prod group3-simulator:prod | gzip | ssh azureuser@<ip> 'gunzip | sudo docker load'
 ```
 
-- `scripts/deploy.sh` does the build, ship and restart in one go: `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh`. There is no CI deploy. Only this repo is deployed, the VM can't build, and CI would need an SSH key as a repo secret.
+- Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploys by itself. The deploy job runs `scripts/deploy.sh` on the GitHub runner (it builds the images, the VM can't). You can also redeploy from the Actions tab (Run workflow on main), or by hand: `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh`.
+- The workflow needs three repo secrets: `VM_HOST`, `VM_SSH_KEY` (a deploy-only key, separate from the admin key) and `VM_KNOWN_HOSTS`. If the VM is recreated, set all three again.
+- CI on every PR: web lint and build, backend install and syntax check, and `docker compose config` for both compose files. `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there.
 - On the VM, `~/group3/` holds `docker-compose.yml`, `docker-compose.prod.yml` and a `.env` with its own `SIMULATOR_API_KEY` (not the same as anyone's local one):
 
 ```bash
