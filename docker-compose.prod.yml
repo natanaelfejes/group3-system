@@ -6,7 +6,7 @@ services:
     image: group3-simulator:prod
   api:
     image: group3-api:prod
-    # Like the simulator: only 127.0.0.1:3000 on the VM. The Pico needs a public port here later (see docs/deployment.md).
+    # Like the simulator: only 127.0.0.1:3000 on the VM. Everything else, the Pico included, reaches it through web on port 80 (/api).
   web:
     image: group3-web:prod
     # Public on port 80. The simulator stays private (no published port in the base file beyond localhost).
