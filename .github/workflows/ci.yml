@@ -53,8 +53,26 @@ jobs:
       - run: docker compose config -q
       - run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
 
+  stack:
+    runs-on: ubuntu-latest
+    env:
+      SIMULATOR_API_KEY: ci0throwaway0key
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Web answers
+        run: curl --fail --silent --show-error -o /dev/null http://localhost:8081/
+      - name: Web proxies /api to the backend and the simulator
+        run: curl --fail --silent --show-error http://localhost:8081/api/health
+      - name: Unknown desk gives 404 from the backend, not 5xx
+        run: test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/api/desks/00:00:00:00:00:00)" = 404
+      - if: failure()
+        run: docker compose logs --no-color --tail 50 | sed "s/$SIMULATOR_API_KEY/***/g"
+      - if: always()
+        run: docker compose down -v
+
   deploy:
-    needs: [web, backend, compose]
+    needs: [web, backend, compose, stack]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     concurrency:

@@ -1,5 +1,4 @@
 # Run with: docker compose up --build
-# The api service gets added here once the backend has a Dockerfile.
 services:
   simulator:
     build: ./simulator
@@ -27,8 +26,32 @@ services:
       timeout: 5s
       retries: 3
 
+  api:
+    build: ./backend
+    environment:
+      # 0.0.0.0 so nginx in the web container can reach it (the default is localhost only).
+      HOST: 0.0.0.0
+      PORT: 3000
+      SIMULATOR_URL: http://simulator:8000
+      SIMULATOR_API_KEY: ${SIMULATOR_API_KEY:?copy .env.example to .env and set a key}
+    # Localhost only for local dev. The prod file publishes nothing for it.
+    # There is no auth yet, so never publish this on all interfaces.
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - simulator
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
   web:
     build: ./web
+    # nginx proxies /api/ to the api service.
+    depends_on:
+      - api
     # 3000 is the backend's port, so the frontend uses 8081.
     ports:
       - "127.0.0.1:8081:80"

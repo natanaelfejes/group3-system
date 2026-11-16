@@ -9,9 +9,10 @@ cd "$(dirname "$0")/.."
 
 docker buildx build --platform linux/amd64 -t group3-web:prod --load ./web
 docker buildx build --platform linux/amd64 -t group3-simulator:prod --load ./simulator
+docker buildx build --platform linux/amd64 -t group3-api:prod --load ./backend
 
 "${SSH[@]}" 'mkdir -p ~/group3'
 scp ${KEY:+-i "$KEY"} docker-compose.yml docker-compose.prod.yml "$VM:~/group3/"
-docker save group3-web:prod group3-simulator:prod | gzip | "${SSH[@]}" 'gunzip | sudo docker load'
+docker save group3-web:prod group3-simulator:prod group3-api:prod | gzip | "${SSH[@]}" 'gunzip | sudo docker load'
 "${SSH[@]}" 'cd ~/group3 && sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build'
 # up -d recreates only containers whose image changed; the simulator is stopped with SIGINT, so desks are saved.

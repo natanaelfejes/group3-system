@@ -5,10 +5,12 @@
 ```bash
 cp .env.example .env        # then set SIMULATOR_API_KEY, e.g. openssl rand -hex 16
 docker compose up --build
-curl http://localhost:8000/api/v2/<your key>/desks
+curl http://localhost:8081/api/health
 ```
 
-The frontend is on http://localhost:8081. The key lives in the root `.env`, and the backend should read the same one once it runs in compose.
+One command starts the simulator, the backend (`api`) and the frontend. The frontend is on http://localhost:8081, the backend on http://localhost:3000 and the simulator on http://localhost:8000 (all localhost only). The key lives in the root `.env`; compose passes the same one to the simulator and the backend, which reaches the simulator as `http://simulator:8000`.
+
+`/api/` on port 8081 is proxied by nginx (`web/nginx.conf`) to the backend, so the browser only talks to one origin, like the Vite dev proxy. Other paths fall back to `index.html`.
 Extra simulator options go in `command:` in `docker-compose.yml`, e.g. `["--desks", "10", "--no-user-simulation"]`.
 
 ## What to know about the simulator
@@ -31,18 +33,19 @@ Render free and Cloud Run sleep or scale to zero when idle, which means slow fir
 
 - Created 2026-11-15, France Central, Standard B2ats_v2 (2 vCPU, 1 GB RAM), Ubuntu, resource group `group3-vm_group`. Public IP 4.233.89.145.
 - Owner: Natanael (SDU Azure for Students subscription). Delete it after the exam, planned for the end of the semester (confirm the date once the exam is scheduled), by deleting the resource group.
-- Port 80 is open to everyone (web). 22 is key-only SSH. The simulator is not published: it listens on 127.0.0.1:8000 on the VM only.
+- Port 80 is open to everyone (web). 22 is key-only SSH. The simulator and the backend are not public: they listen on 127.0.0.1:8000 and 127.0.0.1:3000 on the VM only, and web proxies `/api` to the backend.
 - It has 2 GB swap because 1 GB RAM is tight. Never build images on the VM. Build for `linux/amd64` on a laptop and load them:
 
 ```bash
 docker buildx build --platform linux/amd64 -t group3-web:prod --load ./web
 docker buildx build --platform linux/amd64 -t group3-simulator:prod --load ./simulator
-docker save group3-web:prod group3-simulator:prod | gzip | ssh azureuser@<ip> 'gunzip | sudo docker load'
+docker buildx build --platform linux/amd64 -t group3-api:prod --load ./backend
+docker save group3-web:prod group3-simulator:prod group3-api:prod | gzip | ssh azureuser@<ip> 'gunzip | sudo docker load'
 ```
 
 - Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploys by itself. The deploy job runs `scripts/deploy.sh` on the GitHub runner (it builds the images, the VM can't). You can also redeploy from the Actions tab (Run workflow on main), or by hand: `VM=azureuser@<ip> KEY=~/.ssh/<your key> scripts/deploy.sh`.
 - The workflow needs three repo secrets: `VM_HOST`, `VM_SSH_KEY` (a deploy-only key, separate from the admin key) and `VM_KNOWN_HOSTS`. If the VM is recreated, set all three again.
-- CI on every PR: web lint and build, backend install and syntax check, and `docker compose config` for both compose files. `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there.
+- CI on every PR: web lint and build, backend install and syntax check, `docker compose config` for both compose files, and a `stack` job that runs `docker compose up --build` with a throwaway key and checks web (200), `/api/health` through web (200) and an unknown desk (404). Deploy needs all of them. `npm test` runs in `web/` and `backend/` as soon as a `test` script exists there.
 - On the VM, `~/group3/` holds `docker-compose.yml`, `docker-compose.prod.yml` and a `.env` with its own `SIMULATOR_API_KEY` (not the same as anyone's local one):
 
 ```bash
@@ -52,9 +55,9 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-
 - To get SSH access, send your public key to the owner, who appends it to `~/.ssh/authorized_keys` on the VM.
 - Gotchas: the subscription only allows norwayeast, polandcentral, switzerlandnorth, italynorth and francecentral (policy), and the new VM wizard hides them, so use the "previous experience" wizard. Availability zone 1 hides the B-series, so pick "no infrastructure redundancy".
 - Tested on 2026-11-15: web returns 200 from outside, port 8000 is not reachable from outside, simulator is healthy, right key 200 and wrong key 401, and desk state is written to the volume on `docker compose stop`.
-- The backend is not in compose yet, so `/api` is not proxied on the VM until it is merged.
+- The backend has no auth. Through web on port 80, `/api` is public, including `PUT .../position`.
 
 ## Open points
 
-1. The Pico calls the API over plain HTTP. That works against the VM on port 80, but the traffic is not encrypted, so don't put anything real in it. TLS in the firmware is the proper fix.
+1. The Pico needs the API reachable from outside. Port 80 works through the web proxy (`http://<ip>/api/...`), or we publish 3000 on the VM and open it in the NSG. The Pico calls the API over plain HTTP, but the traffic is not encrypted, so don't put anything real in it. TLS in the firmware is the proper fix.
 2. Credentials stay in a password manager, not the repo.
