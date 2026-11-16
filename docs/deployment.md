@@ -48,7 +48,7 @@ Every push to `main` that passes the checks in `.github/workflows/ci.yml` deploy
 
 The deploy job runs in the GitHub environment `production`, which only `main` can use. It has three environment secrets (not repo secrets): `VM_HOST`, `VM_SSH_KEY` and `VM_KNOWN_HOSTS`. For the last one use the output of `ssh-keyscan -t ed25519 <ip>`.
 
-`VM_SSH_KEY` is separate from the admin key, but it's not a weak one: `azureuser` has `sudo docker`, so it's root on the VM. A merged change to `ci.yml` could send the key anywhere, so PRs touching `.github/` or `scripts/` need a code owner's approval (`.github/CODEOWNERS`, enforced by the ruleset). Other PRs can be self-merged.
+`VM_SSH_KEY` is separate from the admin key, but it's not a weak one: `azureuser` has `sudo docker`, so it's root on the VM. A merged change to `ci.yml` could send the key anywhere, so PRs touching `.github/` or `scripts/` get a review first (CONTRIBUTING.md). GitHub doesn't enforce it, we trust each other.
 
 ### CI on every PR
 

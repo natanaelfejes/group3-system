@@ -1,5 +1,0 @@
-# PRs that touch these need an approval from one of the owners (GitHub blocks the merge otherwise).
-# The deploy job holds a key that is root on the VM, so changes here get a second pair of eyes.
-# Everything else can be self-merged in an emergency, see CONTRIBUTING.md.
-/.github/ @natanaelfejes @IttzDavid
-/scripts/ @natanaelfejes @IttzDavid
