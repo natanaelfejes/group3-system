@@ -34,6 +34,10 @@ GET /api/desks/cd:fb:1a:53:fb:e6/state HTTP/1.1
 
 Answers with `position_mm`, `speed_mms` (0 when it stopped) and `status`.
 
+## Planned: saved position
+
+The return button should go back to the height the user saved, not a value hardcoded on the Pico. That needs a `GET` for the saved position, which needs the database and login first. Tracked in SCRUM-49.
+
 ## Errors
 
 | Code | Meaning |
