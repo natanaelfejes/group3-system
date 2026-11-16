@@ -84,5 +84,5 @@ Checked on 2026-11-15: web returns 200 from outside, port 8000 isn't reachable f
 
 ## Open points
 
-1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`). That's plain HTTP, so nothing is encrypted, don't send anything real. TLS in the firmware is the proper fix.
+1. The Pico reaches the API through the web proxy on port 80 (`http://<ip>/api/...`, exact requests in [pico-api.md](pico-api.md)). That's plain HTTP, so nothing is encrypted, don't send anything real. TLS in the firmware is the proper fix.
 2. Credentials go in a password manager, not the repo.

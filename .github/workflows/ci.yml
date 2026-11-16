@@ -64,6 +64,10 @@ jobs:
         run: curl --fail --silent --show-error http://localhost:8081/api/health
       - name: Unknown desk gives 404 from the backend, not 5xx
         run: test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/api/desks/00:00:00:00:00:00)" = 404
+      - name: The Pico's request moves a desk (see docs/pico-api.md)
+        run: |
+          id=$(curl -fsS http://localhost:8081/api/desks | jq -r '.[0]')
+          curl -fsS -X PUT -H 'Content-Type: application/json' -d '{"position_mm":1000}' "http://localhost:8081/api/desks/$id/position" | jq -e '.position_mm == 1000'
       - if: failure()
         run: docker compose logs --no-color --tail 50 | sed "s/$SIMULATOR_API_KEY/***/g"
       - if: always()
