@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '127.0.0.1';
 
 const app = express();
+app.set('trust proxy', 1); // behind nginx in compose, so req.ip is the real client (nginx sets X-Forwarded-For)
 app.use(express.json()); // lets us read JSON sent in requests
 
 // ===== Routes =====
@@ -43,7 +44,8 @@ app.use((err, _req, res, _next) => {
     res.status(404).json({ error: 'Desk not found (it may be powered off)' });
   } else if (err instanceof SimulatorError) {
     // 503 = simulator is not running, 502 = simulator gave some other error
-    console.error(err);
+    // Only the message: err.cause can contain the full simulator URL, API key included.
+    console.error(err.message);
     res.status(err.status === null ? 503 : 502).json({ error: err.message });
   } else {
     // 500 = a bug in our own code

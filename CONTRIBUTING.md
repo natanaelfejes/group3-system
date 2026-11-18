@@ -2,8 +2,10 @@
 
 ## Branches and PRs
 - No direct pushes to `main`. Create a branch first: `feature/<name>`, `fix/<name>` or `chore/<name>`.
+- GitHub enforces this: `main` only takes PRs, and the `web`, `backend` and `stack` checks must pass. Every merge to `main` deploys to the VM.
 - Every PR has a short description: what changed and why.
 - Major PR: a review from every member before merging. Small PR: one review is enough.
+- Urgent fix: you can merge your own PR, but say so in Discord. Changes to `.github/` or `scripts/` still get a review first, they can reach the VM.
 - Reviewers respond within 48 hours, all days.
 
 ## Definition of Done

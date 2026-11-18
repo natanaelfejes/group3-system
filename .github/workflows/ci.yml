@@ -1,0 +1,101 @@
+# Checks run on every PR and on main. A push to main that passes them also deploys to the Azure VM.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch: # manual redeploy from the Actions tab
+
+permissions:
+  contents: read
+
+# A new push to a PR cancels the older run. On main, runs queue so a deploy is never cut off halfway.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test --if-present
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: find src -name '*.js' -exec node --check {} +
+      - run: npm test --if-present
+
+  stack:
+    runs-on: ubuntu-latest
+    env:
+      SIMULATOR_API_KEY: ci0throwaway0key
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Only checks that the prod override parses. The port 80 mapping is first really used by deploy.
+      - run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+      - run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Web answers
+        run: curl --fail --silent --show-error -o /dev/null http://localhost:8081/
+      - name: Web proxies /api to the backend and the simulator
+        run: curl --fail --silent --show-error http://localhost:8081/api/health
+      - name: Unknown desk gives 404 from the backend, not 5xx
+        run: test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/api/desks/00:00:00:00:00:00)" = 404
+      - name: The Pico's request moves a desk (see docs/pico-api.md)
+        run: |
+          id=$(curl -fsS http://localhost:8081/api/desks | jq -r '.[0]')
+          curl -fsS -X PUT -H 'Content-Type: application/json' -d '{"position_mm":1000}' "http://localhost:8081/api/desks/$id/position" | jq -e '.position_mm == 1000'
+      - if: failure()
+        run: docker compose logs --no-color --tail 50 | sed "s/$SIMULATOR_API_KEY/***/g"
+      - if: always()
+        run: docker compose down -v
+
+  deploy:
+    needs: [web, backend, stack]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # The three VM secrets are environment secrets, only available on main.
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Set up SSH
+        env:
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_KNOWN_HOSTS: ${{ secrets.VM_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: VM="azureuser@$VM_HOST" KEY=~/.ssh/deploy_key scripts/deploy.sh
+      - name: Check the API answers through web
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+        run: curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-connrefused -o /dev/null "http://$VM_HOST/api/health"
