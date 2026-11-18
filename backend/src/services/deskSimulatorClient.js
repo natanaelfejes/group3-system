@@ -16,6 +16,9 @@
 // ===== Settings (from .env) =====
 const SIMULATOR_URL = process.env.SIMULATOR_URL ?? 'http://localhost:8000';
 const API_KEY = process.env.SIMULATOR_API_KEY;
+
+const DEFINED_PORT = process.env.PORT;
+
 if (!API_KEY) {
   throw new Error('SIMULATOR_API_KEY is missing. Create backend/.env (see backend/README.md).');
 }

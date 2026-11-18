@@ -1,14 +1,22 @@
 import express from 'express';
+import cors from "cors"
 import { desksRouter } from './routes/desks.js';
 import { listDeskIds, SimulatorError } from './services/deskSimulatorClient.js';
+import {parseCookieHeader} from "@supabase/ssr";
+import {AuthenticatorService} from "./services/authenticatorService.js";
+import * as simulator from "./services/deskSimulatorClient.js";
+import {config} from "./config/var.js";
 
-// ===== Settings (from .env) =====
-const PORT = Number(process.env.PORT ?? 3000);
-// IMPORTANT: 127.0.0.1 only allows this computer (safe default, there is no auth yet).
-// Set HOST=0.0.0.0 in .env to let the Pico W connect over Wi-Fi.
-const HOST = process.env.HOST ?? '127.0.0.1';
 
 const app = express();
+
+// Set up cors policy and allow the web client to send cookies
+// - Configures express to allow cross origin requests from the specified url, permitting cookies, authorization headers or certificates
+app.use(cors({
+  origin: config.client.url,
+  credentials: true,
+}));
+
 app.use(express.json()); // lets us read JSON sent in requests
 
 // ===== Routes =====
@@ -31,6 +39,12 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+app.use((req, res, next) => {
+  const authService = new AuthenticatorService(config.supabase.publishableKey, config.supabase.url);
+  req.supabse = authService.getClient(req, res);
+
+})
+
 // ===== Error handling =====
 // IMPORTANT: every error thrown in the routes ends up here.
 // We turn it into a JSON error with the right status code.
@@ -52,16 +66,20 @@ app.use((err, _req, res, _next) => {
   }
 });
 
+app.use((req, res, next) => {
+  const cookies = new map(parseCookieHeader(req.headers.cookie ?? '')).map(({name, value}) => [name, value])
+})
+
 // ===== Start the server =====
-app.listen(PORT, HOST, (error) => {
+app.listen(config.server.port, config.server.host, (error) => {
   if (error) {
     // IMPORTANT: "fail fast" = if the server can't start, stop right away instead of
     // running half-broken. We print a clear reason first, so it's easy to fix. Common ones:
     //   EADDRINUSE    = something else already uses this port (change PORT in .env)
     //   EADDRNOTAVAIL = HOST in .env is not an address of this computer
     // process.exit(1) stops the program; 1 means "ended with an error" (0 would mean success).
-    console.error(`Could not start the API on ${HOST}:${PORT}: ${error.message}`);
+    console.error(`Could not start the API on ${config.server.host}:${config.server.port}: ${error.message}`);
     process.exit(1);
   }
-  console.log(`API listening on http://${HOST}:${PORT}`);
+  console.log(`API listening on http://${config.server.host}:${config.server.port}`);
 });
