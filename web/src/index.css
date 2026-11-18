@@ -1,1 +1,83 @@
 @import "tailwindcss";
+
+/* Lets us use dark: in Tailwind classes. Without this line, dark: would only follow the computer's
+   setting and ignore the light/dark switch in Settings. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    @apply bg-neutral-100 text-neutral-900 antialiased;
+  }
+
+  /*
+   * How dark mode works: the whole app only uses white and grey (neutral) colours.
+   * So instead of writing a dark version for every element, we just swap those colours here
+   * when dark mode is on. White turns dark grey, light greys turn dark, and dark greys turn light.
+   * If you build new things with white and neutral colours, they work in dark mode automatically.
+   */
+  .dark {
+    color-scheme: dark; /* makes the browser's own inputs, dropdowns and scrollbars dark too */
+    --color-white: oklch(21% 0 0); /* used for the cards */
+    --color-neutral-50: oklch(24% 0 0);
+    --color-neutral-100: oklch(15% 0 0); /* used for the page background */
+    --color-neutral-200: oklch(30% 0 0);
+    --color-neutral-300: oklch(38% 0 0);
+    --color-neutral-400: oklch(55% 0 0);
+    --color-neutral-500: oklch(63% 0 0);
+    --color-neutral-600: oklch(72% 0 0);
+    --color-neutral-700: oklch(82% 0 0);
+    --color-neutral-800: oklch(88% 0 0);
+    --color-neutral-900: oklch(96% 0 0); /* used for the text */
+  }
+}
+
+/* Our own classes
+   If the same style is used in a lot of places, make a class for it here. */
+@layer components {
+  /* The white box with a border, used for the sidebar, the dashboard tiles and so on */
+  .card {
+    @apply rounded-xl border border-neutral-200 bg-white;
+  }
+
+  /* The small grey title in capitals at the top of a box, like "DESK CONTROL" */
+  .section-title {
+    @apply text-xs font-medium tracking-wider text-neutral-600 uppercase;
+  }
+
+  /* The small rounded grey label, like "Desk 14 · Connected" */
+  .badge {
+    @apply rounded-full bg-neutral-200 px-3 py-1 text-xs;
+  }
+
+  /* Buttons. .btn is the white one with a border (like "▲ Up"), .btn-primary is the dark one (like "Save routine") */
+  .btn {
+    @apply rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm hover:bg-neutral-50;
+  }
+  .btn-primary {
+    @apply rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700;
+  }
+
+  /* Labels and input boxes in forms */
+  .label {
+    @apply mb-1 block text-xs font-medium;
+  }
+  .input {
+    @apply w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none;
+  }
+
+  /* The links in the menu on the left (computer) */
+  .nav-link {
+    @apply flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-600 hover:bg-neutral-100;
+  }
+  .nav-link-active {
+    @apply bg-neutral-200 font-medium text-neutral-900 hover:bg-neutral-200;
+  }
+
+  /* The links in the menu at the bottom (phone). The icon is on top and the name under it. */
+  .tab-link {
+    @apply flex flex-1 flex-col items-center gap-1 px-1 py-2 text-center text-xs text-neutral-500;
+  }
+  .tab-link-active {
+    @apply font-semibold text-neutral-900;
+  }
+}
