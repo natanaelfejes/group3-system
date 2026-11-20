@@ -15,9 +15,11 @@ export function Section({
 }) {
   return (
     <section className={`card p-5 ${className}`}>
-      <div className="mb-4 flex min-h-9 items-center justify-between gap-4">
-        <h2 className="section-title">{title}</h2>
-        {action}
+      <div className=" flex min-h-9 items-center justify-between ">
+        <h2 className="w-1/4 section-title">{title}</h2>
+        <div className="w-1/3">
+          {action}
+        </div>
       </div>
       {children}
     </section>

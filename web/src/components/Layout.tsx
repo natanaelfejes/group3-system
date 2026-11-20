@@ -32,7 +32,7 @@ export function Layout({ user, pages, currentPath, onNavigate, onLogout, childre
       </header>
 
       {/* Extra space at the bottom on phones, so the bottom menu doesn't cover the page */}
-      <div className="flex flex-1 gap-4 p-4 pb-20 md:pb-4">
+      <div className="h-full flex flex-1 gap-4 p-4 pb-20 md:pb-4">
         <nav className="card hidden w-48 shrink-0 p-2 md:block">
           {pages.map((page) => (
             <button
@@ -46,7 +46,7 @@ export function Layout({ user, pages, currentPath, onNavigate, onLogout, childre
             </button>
           ))}
         </nav>
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="h-full min-w-0 flex-1">{children}</main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-neutral-200 bg-white md:hidden">
