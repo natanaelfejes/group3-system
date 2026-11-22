@@ -1,13 +1,15 @@
 // Tests for the backend API. Run with: npm test (in backend/)
 // We start the real server (src/server.js) as a child process and talk to it over HTTP.
 // A small fake simulator on another port gives it desks to read, so no Docker is needed.
-import { test, before, after } from 'node:test';
+import { test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { spawn } from 'node:child_process';
 
 const KEY = 'testkey123';
 const DESK = 'cd:fb:1a:53:fb:e6';
+const DESK_NO_ERRORS = 'aa:bb:cc:dd:ee:ff'; // a desk that has no lastErrors field
 const BASE = `/api/v2/${KEY}/desks`;
 
 const desk = {
@@ -18,9 +20,13 @@ const desk = {
 };
 
 let fake; // fake simulator
-let api; // child process running src/server.js
-let url; // http://127.0.0.1:<port> of the api
+let api; // the server under test: { child, port, url, out }
 let lastPut; // body of the last PUT the fake simulator got
+const children = []; // every server we start, so after() can stop them all
+
+beforeEach(() => {
+  lastPut = undefined;
+});
 
 function startFakeSimulator() {
   return new Promise((resolve) => {
@@ -34,14 +40,15 @@ function startFakeSimulator() {
       req.on('end', () => {
         const path = req.url;
         if (path === BASE) return send(200, [DESK]);
-        if (path === `${BASE}/boom`) return send(500, { error: 'broken' });
         if (path === `${BASE}/${DESK}`) return send(200, desk);
+        if (path === `${BASE}/${DESK_NO_ERRORS}`) return send(200, { config: desk.config, state: desk.state, usage: desk.usage });
         if (path === `${BASE}/${DESK}/config`) return send(200, desk.config);
         if (path === `${BASE}/${DESK}/state` && req.method === 'GET') return send(200, desk.state);
         if (path === `${BASE}/${DESK}/usage`) return send(200, desk.usage);
         if (path === `${BASE}/${DESK}/state` && req.method === 'PUT') {
           lastPut = JSON.parse(raw);
-          return send(200, lastPut);
+          // Like a real desk, answer with the height it accepted, which can differ from the request.
+          return send(200, { position_mm: lastPut.position_mm - (lastPut.position_mm % 10) });
         }
         send(404, { error: 'not found' });
       });
@@ -50,31 +57,60 @@ function startFakeSimulator() {
   });
 }
 
-// Starts src/server.js on a free port and waits until it says it is listening.
-function startApi(simulatorUrl, port) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['src/server.js'], {
-      env: { ...process.env, PORT: String(port), SIMULATOR_URL: simulatorUrl, SIMULATOR_API_KEY: KEY },
-      stdio: ['ignore', 'pipe', 'pipe'],
+// A port nobody uses right now: open one, read its number, close it again.
+function freePort() {
+  return new Promise((resolve) => {
+    const s = net.createServer();
+    s.listen(0, '127.0.0.1', () => {
+      const port = s.address().port;
+      s.close(() => resolve(port));
     });
-    child.stdout.on('data', (d) => d.toString().includes('API listening') && resolve(child));
-    child.on('exit', (code) => reject(new Error(`server exited early (${code})`)));
   });
 }
 
-const call = (path, options) => fetch(url + path, options);
+// Starts src/server.js on a free port and waits until it says it is listening.
+// `env` overrides the defaults. Rejects (with the server's own output) if it dies or is silent for 5 s.
+async function startApi(simulatorUrl, env = {}) {
+  const port = await freePort();
+  const child = spawn(process.execPath, ['src/server.js'], {
+    // HOST and PORT are set here so values from the developer's shell or CI can't leak in.
+    env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), SIMULATOR_URL: simulatorUrl, SIMULATOR_API_KEY: KEY, ...env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  children.push(child);
+  const server = { child, port, url: `http://127.0.0.1:${port}`, out: '' };
+  child.stdout.on('data', (d) => (server.out += d));
+  child.stderr.on('data', (d) => (server.out += d));
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`server did not start within 5s:\n${server.out}`)), 5000);
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      reject(new Error(`server exited early (${code}):\n${server.out}`));
+    });
+    child.stdout.on('data', () => {
+      if (server.out.includes('API listening')) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+  });
+  return server;
+}
+
+const call = (path, options) => fetch(api.url + path, options);
 const put = (path, body) =>
   call(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 before(async () => {
   fake = await startFakeSimulator();
-  api = await startApi(`http://127.0.0.1:${fake.address().port}`, 38101);
-  url = 'http://127.0.0.1:38101';
+  api = await startApi(`http://127.0.0.1:${fake.address().port}`);
 });
 
-after(() => {
-  api?.kill();
+after(async () => {
+  // wait until every server we started has really stopped
+  await Promise.all(children.map((c) => (c.exitCode === null ? new Promise((r) => (c.once('exit', r), c.kill())) : null)));
   fake?.close();
+  fake?.closeAllConnections?.();
 });
 
 test('health: ok when the simulator answers', async () => {
@@ -103,11 +139,24 @@ test('errors endpoint returns lastErrors', async () => {
   assert.deepEqual(await (await call(`/api/desks/${DESK}/errors`)).json(), desk.lastErrors);
 });
 
+test('errors endpoint returns [] when the desk has no lastErrors', async () => {
+  const res = await call(`/api/desks/${DESK_NO_ERRORS}/errors`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), []);
+});
+
 test('PUT position moves the desk (what the Pico sends)', async () => {
   const res = await put(`/api/desks/${DESK}/position`, { position_mm: 1000 });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { position_mm: 1000 });
   assert.deepEqual(lastPut, { position_mm: 1000 });
+});
+
+test('PUT position answers with the height the simulator accepted, not the one we sent', async () => {
+  // the fake rounds 1005 down to 1000
+  const res = await put(`/api/desks/${DESK}/position`, { position_mm: 1005 });
+  assert.deepEqual(await res.json(), { position_mm: 1000 });
+  assert.deepEqual(lastPut, { position_mm: 1005 });
 });
 
 test('PUT position accepts the limits 680 and 1320', async () => {
@@ -116,7 +165,6 @@ test('PUT position accepts the limits 680 and 1320', async () => {
 });
 
 test('PUT position rejects bad values with 400 and never reaches the simulator', async () => {
-  lastPut = undefined;
   for (const bad of [{ position_mm: 679 }, { position_mm: 1321 }, { position_mm: 1000.5 }, { position_mm: '1000' }, {}]) {
     assert.equal((await put(`/api/desks/${DESK}/position`, bad)).status, 400, JSON.stringify(bad));
   }
@@ -126,15 +174,18 @@ test('PUT position rejects bad values with 400 and never reaches the simulator',
 test('PUT position without a JSON content type is 400', async () => {
   const res = await call(`/api/desks/${DESK}/position`, { method: 'PUT', body: '{"position_mm":1000}' });
   assert.equal(res.status, 400);
+  assert.equal(lastPut, undefined);
 });
 
 test('PUT position with broken JSON is 400', async () => {
   assert.equal((await put(`/api/desks/${DESK}/position`, '{"position_mm":')).status, 400);
+  assert.equal(lastPut, undefined);
 });
 
-test('bad desk id is 400 (also path tricks)', async () => {
-  assert.equal((await call('/api/desks/not-a-mac')).status, 400);
-  assert.equal((await call('/api/desks/..%2F..%2Fx')).status, 400);
+test('bad desk id is 400 (also path tricks and ids with extra characters around a real one)', async () => {
+  for (const bad of ['not-a-mac', '..%2F..%2Fx', `${DESK}%2F..%2Fx`, `${DESK}x`, `x${DESK}`]) {
+    assert.equal((await call(`/api/desks/${bad}`)).status, 400, bad);
+  }
 });
 
 test('desk that does not exist is 404', async () => {
@@ -147,32 +198,33 @@ test('unknown route is a JSON 404', async () => {
   assert.deepEqual(await res.json(), { error: 'Not found' });
 });
 
-test('simulator error becomes 502 and the key is not in the answer', async () => {
-  // not a valid desk id for the route, so go through health with a broken simulator instead
+test('simulator error becomes 502 and the key is nowhere (answer, logs)', async () => {
   const broken = http.createServer((_req, res) => {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end('{"error":"broken"}');
   });
-  await new Promise((r) => broken.listen(0, '127.0.0.1', r));
-  const child = await startApi(`http://127.0.0.1:${broken.address().port}`, 38102);
   try {
-    const res = await fetch(`http://127.0.0.1:38102/api/desks/${DESK}`);
+    await new Promise((r) => broken.listen(0, '127.0.0.1', r));
+    const server = await startApi(`http://127.0.0.1:${broken.address().port}`);
+    const res = await fetch(`${server.url}/api/desks/${DESK}`);
     assert.equal(res.status, 502);
     assert.ok(!(await res.text()).includes(KEY));
+    assert.ok(!server.out.includes(KEY), 'key found in the server logs');
   } finally {
-    child.kill();
     broken.close();
   }
 });
 
-test('simulator down is 503 on health and on desks, without the key', async () => {
-  const child = await startApi('http://127.0.0.1:1', 38103); // nothing listens on port 1
-  try {
-    const health = await fetch('http://127.0.0.1:38103/api/health');
-    assert.equal(health.status, 503);
-    assert.ok(!(await health.text()).includes(KEY));
-    assert.equal((await fetch('http://127.0.0.1:38103/api/desks')).status, 503);
-  } finally {
-    child.kill();
-  }
+test('simulator down is 503 on health and on desks, key nowhere', async () => {
+  const dead = await freePort(); // nothing listens on it
+  const server = await startApi(`http://127.0.0.1:${dead}`);
+  const health = await fetch(`${server.url}/api/health`);
+  assert.equal(health.status, 503);
+  assert.ok(!(await health.text()).includes(KEY));
+  assert.equal((await fetch(`${server.url}/api/desks`)).status, 503);
+  assert.ok(!server.out.includes(KEY), 'key found in the server logs');
+});
+
+test('server refuses to start without SIMULATOR_API_KEY', async () => {
+  await assert.rejects(startApi('http://127.0.0.1:1', { SIMULATOR_API_KEY: '' }), /SIMULATOR_API_KEY is missing/);
 });

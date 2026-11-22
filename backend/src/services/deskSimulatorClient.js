@@ -69,7 +69,7 @@ export async function getDeskUsage(deskId) {
 // Last errors, newest first.
 // IMPORTANT: we read the whole desk here, because the simulator gives a 404 for /lastErrors when there are no errors.
 export async function getDeskErrors(deskId) {
-  return (await getDesk(deskId)).lastErrors;
+  return (await getDesk(deskId)).lastErrors ?? [];
 }
 
 // ===== Set data =====
