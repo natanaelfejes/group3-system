@@ -1,15 +1,16 @@
 import {PageHeader} from "../../components/PageHeader.tsx";
 import {Section} from "../../components/Section.tsx";
 import {useEffect, useState} from "react";
-import DeskStateTag from "./DeskStateTag.tsx";
+import DeskStateTag from "./components/DeskStateTag.tsx";
 import {ListTable} from "../../components/ListTable.tsx";
-import Desk from "../../../Model/Desk.ts";
 import Error from "../../../Model/Error.ts"
+import {ConfirmPopup} from "./components/ConfirmPopup.tsx";
 export function MaintenanceDeskPage() {
 
     /// ======= JUST FOR UI TESTING, CAN BE REMOVED
     const [deskProps, setDeskProps] = useState<Map<string, string>>(new Map<string, string>());
     const [deskErrors, setDeskErrors] = useState<Array<Error>>(new Array<Error>());
+    const [openPopup, setOpenPopup] = useState<boolean>(false);
 
     useEffect(() => {
 
@@ -37,16 +38,26 @@ export function MaintenanceDeskPage() {
 
         setDeskProps(deskPropsMap);
         setDeskErrors(errors);
+
+        
     },[])
     /// ============
 
     return (
         <>
+            {openPopup && (
+                <ConfirmPopup
+                    deskId={67}
+                    onCancel={() => setOpenPopup(false)}
+                    onConfirm={() => { setOpenPopup(false);}
+                }
+                />
+            )}
             <PageHeader title={"Desk 67"} description={"Assigned to Matous floor 2"}>
                 <div className="flex justify-between align-center w-1/3 md:w-1/5" >
                     <DeskStateTag deskState="Error" />
                     <button type="button" className="btn flex-1 md:flex-none">Mark as fixed</button>
-                    <button type="button" className="btn flex-1 md:flex-none">Power Off</button>
+                    <button onClick={() => setOpenPopup(true)} type="button" className="btn flex-1 md:flex-none">Power Off</button>
                 </div>
             </PageHeader>
             <div className="w-full flex-col  justify-between" >
