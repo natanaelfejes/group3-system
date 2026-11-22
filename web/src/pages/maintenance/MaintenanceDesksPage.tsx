@@ -10,7 +10,7 @@ export function MaintenanceDesksPage() {
 
 
     //=== Just for testing purposes of the UI. Remove later =====
-    const [allDesksCategories, setAllDesksCategories]= useState<Map<string, number>>(new Map<string, number>());
+    const [allDesksCategories, setAllDesksCategories] = useState<Map<string, number>>(new Map<string, number>());
     const [allDesks, setAllDesks] = useState<Desk[]>(new Array<Desk>());
 
     useEffect(() => {
@@ -54,6 +54,8 @@ export function MaintenanceDesksPage() {
     }, []);
 
     //===============
+
+
   return (
     <>
         <div className="hidden md:block">
@@ -69,8 +71,12 @@ export function MaintenanceDesksPage() {
                 ))}
             </div>
 
-            <Section title="DeskList" className="hidden md:col-span-2 md:block" action={<input id="sit_minutes" name="sit_minutes" type="text" className="input" placeholder="Search desk" />}>
-                <ListTable<Desk> listItems={allDesks} tableHeaders={allDesks.length != 0 ? Object.keys(allDesks[0]): []} />
+            <Section title="DeskList" className=" md:col-span-2 md:block md:mt-5.5" action={<input id="sit_minutes" name="sit_minutes" type="text" className="input" placeholder="Search desk" />}>
+                <ListTable<Desk> listItems={allDesks} tableHeaders={allDesks.length != 0 ? Object.keys(allDesks[0]): []}
+                                 actionElement={<button onClick={() => console.log("Button trigger")} type="button" className="inline-flex h-[60px] w-[123px] items-center justify-center gap-2 rounded-[9px]  font-medium transition-colors hover:bg-[#d6d6d6] hover:text-[#1A1A1A]">
+                    View <span aria-hidden="true">→</span>
+                    </button>}
+                />
             </Section>
         </div>
     </>

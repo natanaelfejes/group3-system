@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage.tsx'
 import { MaintenanceDesksPage } from './pages/maintenance/MaintenanceDesksPage.tsx'
 import { PresetsRoutinesPage } from './pages/PresetsRoutinesPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
+import {MaintenanceDeskPage} from "./pages/maintenance/MaintenanceDeskPage.tsx";
 
 // Every page gets the logged-in user, so it knows whose data to load
 export type PageProps = { user: User }
@@ -38,10 +39,16 @@ const PAGES: PageConfig[] = [
     icon: DesksIcon,
     views: { admin: AdminDesksPage, maintenance_worker: MaintenanceDesksPage },
   },
+  {
+    path: '/desk',
+    label: 'Desk',
+    icon: DesksIcon,
+    views: { maintenance_worker: MaintenanceDeskPage}
+  },
   { path: '/settings', label: 'Settings', icon: SettingsIcon, views: forAllRoles(SettingsPage) },
 ]
 
-export type Page = { path: string; label: string; icon: ComponentType; Component: PageComponent }
+export type Page = { path: string; label: string; icon: ComponentType; Component: PageComponent}
 
 // Gives back only the pages this role is allowed to see
 export function pagesFor(role: Role): Page[] {

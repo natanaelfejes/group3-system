@@ -15,7 +15,7 @@ export function Section({
 }) {
   return (
     <section className={`card p-5 ${className}`}>
-      <div className=" flex min-h-9 items-center justify-between ">
+      <div className="flex min-h-9 items-center justify-between ">
         <h2 className="w-1/4 section-title">{title}</h2>
         <div className="w-1/3">
           {action}
@@ -25,3 +25,5 @@ export function Section({
     </section>
   )
 }
+
+
