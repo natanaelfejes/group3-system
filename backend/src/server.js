@@ -1,6 +1,7 @@
 import express from 'express';
 import { desksRouter } from './routes/desks.js';
 import { listDeskIds, SimulatorError } from './services/deskSimulatorClient.js';
+import { checkDb } from './db.js';
 
 // ===== Settings (from .env) =====
 const PORT = Number(process.env.PORT ?? 3000);
@@ -14,13 +15,19 @@ app.use(express.json()); // lets us read JSON sent in requests
 
 // ===== Routes =====
 
-// Checks if the API and the simulator are both working
+// Checks if the API, the simulator and the database are working.
+// The database does not change the status code: the Pico only needs the simulator.
+// db is "ok", "not configured" (no DATABASE_URL) or "error".
 app.get('/api/health', async (_req, res) => {
+  const db = await checkDb().catch((err) => {
+    console.error(`Database check failed: ${err.message}`);
+    return 'error';
+  });
   try {
     await listDeskIds();
-    res.json({ api: 'ok', simulator: 'ok' });
+    res.json({ api: 'ok', simulator: 'ok', db });
   } catch (err) {
-    res.status(503).json({ api: 'ok', simulator: 'error', error: err.message });
+    res.status(503).json({ api: 'ok', simulator: 'error', db, error: err.message });
   }
 });
 

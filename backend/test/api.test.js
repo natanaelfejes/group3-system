@@ -116,7 +116,18 @@ after(async () => {
 test('health: ok when the simulator answers', async () => {
   const res = await call('/api/health');
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { api: 'ok', simulator: 'ok' });
+  assert.deepEqual(await res.json(), { api: 'ok', simulator: 'ok', db: 'not configured' });
+});
+
+test('health: db is "error" (and the status stays 200) when DATABASE_URL points nowhere, password not logged', async () => {
+  const dead = await freePort();
+  const server = await startApi(`http://127.0.0.1:${fake.address().port}`, {
+    DATABASE_URL: `postgresql://user:secretpw123@127.0.0.1:${dead}/postgres`,
+  });
+  const res = await fetch(`${server.url}/api/health`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { api: 'ok', simulator: 'ok', db: 'error' });
+  assert.ok(!server.out.includes('secretpw123'), 'database password found in the server logs');
 });
 
 test('GET /api/desks lists desk ids', async () => {
