@@ -277,6 +277,14 @@ dbTest('POST: bad name, email, role or desk_id is 400 and nothing is stored', as
   assert.equal((await post({ ...ok, name: 'x'.repeat(100) })).status, 201);
 });
 
+dbTest('POST with an UPPERCASE desk_id works and assigns the desk', async () => {
+  await reset();
+  const res = await post({ name: 'Amy', email: 'amy@x.dk', role: 'worker', desk_id: D1.toUpperCase() });
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).desk_id, D1);
+  assert.equal(await deskOwner(D1), (await q('select user_id from users'))[0].user_id);
+});
+
 dbTest('POST without a JSON content type is 400', async () => {
   await reset();
   const res = await call('/api/users', { method: 'POST', body: JSON.stringify({ name: 'Amy', email: 'amy@x.dk', role: 'worker' }) });
@@ -363,6 +371,49 @@ dbTest('PATCH: 404 for a missing user, 422 for a missing desk, 400 for bad bodie
 });
 
 // ===== Delete =====
+
+// ===== Two requests at the same time =====
+// Each race is repeated a few times, because without the locks it only goes wrong some of the time.
+const ROUNDS = 8;
+const statuses = (responses) => responses.map((r) => r.status).sort();
+
+dbTest('race: two POSTs with the same email (different letter case) give one 201 and one 409', async () => {
+  // the test table has a unique index on email, but only on the exact text: just the advisory lock stops Amy@ and amy@
+  for (let i = 0; i < ROUNDS; i++) {
+    await reset();
+    const res = await Promise.all([
+      post({ name: 'A', email: 'Amy@x.dk', role: 'worker' }),
+      post({ name: 'B', email: 'amy@X.dk', role: 'worker' }),
+    ]);
+    assert.deepEqual(statuses(res), [201, 409], `round ${i}`);
+    assert.equal((await q('select * from users')).length, 1, `round ${i}`);
+  }
+});
+
+dbTest('race: two POSTs for different users with the same free desk give one 201 and one 409', async () => {
+  for (let i = 0; i < ROUNDS; i++) {
+    await reset();
+    const res = await Promise.all([
+      post({ name: 'A', email: 'a@x.dk', role: 'worker', desk_id: D1 }),
+      post({ name: 'B', email: 'b@x.dk', role: 'worker', desk_id: D1 }),
+    ]);
+    assert.deepEqual(statuses(res), [201, 409], `round ${i}`);
+    assert.equal((await q('select * from users')).length, 1, `round ${i}`);
+  }
+});
+
+dbTest('race: two PATCHes moving different users to the same free desk give one 200 and one 409', async () => {
+  for (let i = 0; i < ROUNDS; i++) {
+    await reset();
+    const a = await addUser('A', 'a@x.dk');
+    const b = await addUser('B', 'b@x.dk');
+    const res = await Promise.all([patch(a, { desk_id: D1 }), patch(b, { desk_id: D1 })]);
+    assert.deepEqual(statuses(res), [200, 409], `round ${i}`);
+    const owner = await deskOwner(D1);
+    assert.equal((await q('select count(*)::int as n from desks where user_id = $1 or user_id = $2', [a, b]))[0].n, 1, `round ${i}`);
+    assert.ok(owner === a || owner === b);
+  }
+});
 
 dbTest('DELETE: 204, desk is freed, presets/routines/health of that user are gone, others stay', async () => {
   await reset();
