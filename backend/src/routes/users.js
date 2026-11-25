@@ -169,10 +169,9 @@ usersRouter.delete('/users/:user_id', async (req, res, next) => {
 const DB_DOWN_CODE = /^(08|53|57P)|^(ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|EAI_AGAIN)$/;
 const DB_DOWN_MESSAGE = /timeout exceeded when trying to connect|Connection terminated|connection error/i;
 
-usersRouter.use((err, _req, res, next) => {
+usersRouter.use((err, _req, res, _next) => {
   if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
   if (err.code === '23505') return res.status(409).json({ error: 'Email already exists or desk already taken' });
-  if (err.type === 'entity.parse.failed') return next(err); // broken JSON: app handler answers 400
   // Only the message: pg errors and the pool can mention the host, never log the whole error.
   console.error(`Users API error: ${err.message}`);
   if (DB_DOWN_CODE.test(err.code ?? '') || DB_DOWN_MESSAGE.test(err.message)) {
