@@ -30,6 +30,24 @@ Requires Node.js 22.9 or newer.
 
 `src/db.js` exports a `pg` connection pool built from `DATABASE_URL`. Get the string in the Supabase dashboard: Project > Connect > Session pooler (works over IPv4, the VM needs that). Keep it in `.env` only. Tables (`users`, `desks`, `presets`, ...) are created in Supabase, not by this code.
 
+## User admin API (off by default)
+
+`GET/POST /api/users`, `PATCH/DELETE /api/users/:user_id` and `GET /api/db/desks` read and change the `users` and `desks` tables. They are only mounted when `ENABLE_USER_ADMIN_API=1` is set and `DATABASE_URL` works; otherwise they answer the normal JSON 404.
+
+> **Warning:** there is no authentication. nginx exposes `/api/` publicly on the VM, so anyone could create, change or delete users. Enable it only when requests are authenticated (or locally). It is not set in docker-compose or CI on purpose.
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/users` | | `[{user_id, name, email, role, created_at, desk_id}]` ordered by name. `desk_id` is the user's desk or `null` |
+| GET | `/api/db/desks` | | `[{desk_id, manufacturer, user_id}]` (`user_id` is `null` when free) |
+| POST | `/api/users` | `{name, email, role, desk_id?}` | 201 and the user. `name` 1 to 100 characters (trimmed), `email` valid and at most 254, `role` is `admin`, `worker` or `maintenance_worker` |
+| PATCH | `/api/users/:user_id` | `{role?, desk_id?}` | 200 and the user. `desk_id: null` unassigns, a uuid moves the user to that (free) desk. Other keys are a 400 |
+| DELETE | `/api/users/:user_id` | | 204. Frees the desk and deletes the user's `routines`, `presets` and `health` rows |
+
+Each write is one transaction. Errors are JSON `{"error": "..."}`: 400 bad body or uuid (also no `Content-Type: application/json`), 404 user or desk not found, 409 email already used (any letter case) or desk already taken, 503 `Database not configured` or database not reachable.
+
+Tests for it need a throwaway Postgres on localhost and skip without `TEST_DATABASE_URL`, see the top of `test/users.test.js`.
+
 ## Endpoints
 
 `:deskId` is the desk's MAC address, e.g. `cd:fb:1a:53:fb:e6`. Get the list from `GET /api/desks`.
@@ -68,6 +86,7 @@ The Pico calls the deployed backend through port 80: `http://4.233.89.145/api/..
 |---|---|
 | `src/services/deskSimulatorClient.js` | One function per simulator call: `listDeskIds`, `getDesk`, `getDeskState`, `getDeskConfig`, `getDeskUsage`, `getDeskErrors`, `setDeskPosition`. Import these from any backend code that needs desks. |
 | `src/routes/desks.js` | The `/api/desks` endpoints |
+| `src/routes/users.js` | The user admin endpoints (only when `ENABLE_USER_ADMIN_API=1`) |
 | `src/server.js` | Entry point: Express app, `/api/health`, turns errors into HTTP status codes |
 
 Simulator quirks the client already handles:
