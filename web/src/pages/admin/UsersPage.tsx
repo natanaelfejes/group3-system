@@ -6,8 +6,6 @@ import { PageHeader } from '../../components/PageHeader.tsx'
 import { ROLES, ROLE_LABELS } from '../../auth.ts'
 import type { Role } from '../../auth.ts'
 
-// Only the admin can open this page
-
 // Only office workers have a desk. Admin and maintenance show "–" in the desk column.
 function hasDesk(role: Role) {
   return role === 'worker'
@@ -227,10 +225,10 @@ export function UsersPage() {
                           </td>
                           <td className="px-3 py-3">
                             <div className="flex gap-2">
-                              <button type="button" className="btn" disabled={pending} onClick={() => setEditing(user)}>
+                              <button type="button" className="btn" aria-label={`Edit ${user.name}`} disabled={pending} onClick={() => setEditing(user)}>
                                 Edit
                               </button>
-                              <button type="button" className="btn" disabled={pending} onClick={() => setDeleting(user)}>
+                              <button type="button" className="btn" aria-label={`Delete ${user.name}`} disabled={pending} onClick={() => setDeleting(user)}>
                                 Delete
                               </button>
                             </div>
@@ -265,7 +263,7 @@ export function UsersPage() {
       {deleting && (
         <Dialog title="Delete user?" onClose={() => setDeleting(null)}>
           <p className="mb-4 text-sm text-neutral-600">
-            {deleting.name} ({deleting.email}) will lose access and their desk will be free again. This cannot be undone.
+            {deleting.name} ({deleting.email}) will lose access and their desk will be free again. Their presets, routines and health history are deleted too. This cannot be undone.
           </p>
           <div className="flex justify-end gap-2">
             <button type="button" className="btn" onClick={() => setDeleting(null)}>
@@ -383,7 +381,6 @@ function UserDialog({ user, desks, onClose, onSaved }: { user?: UserWithDesk; de
 
   return (
     <Dialog title={user ? 'Edit user' : 'New user'} onClose={close}>
-      {!user && <p className="mb-4 text-sm text-neutral-600">The user gets an email to set their password.</p>}
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div>
           <label className="label" htmlFor="user-name">Full name</label>
