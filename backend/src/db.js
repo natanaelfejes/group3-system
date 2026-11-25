@@ -26,6 +26,8 @@ export const pool = DATABASE_URL
       ssl: isLocal ? false : { rejectUnauthorized: false },
       max: 5,
       connectionTimeoutMillis: 2000,
+      statement_timeout: 10000, // a stuck query or open transaction must not hold a connection for ever
+      idle_in_transaction_session_timeout: 10000,
     })
   : null;
 
