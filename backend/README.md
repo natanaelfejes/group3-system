@@ -40,7 +40,7 @@ Requires Node.js 22.9 or newer.
 |---|---|---|---|
 | GET | `/api/users` | | `[{user_id, name, email, role, created_at, desk_id}]` ordered by name. `desk_id` is the user's desk or `null` |
 | GET | `/api/db/desks` | | `[{desk_id, manufacturer, user_id}]` (`user_id` is `null` when free) |
-| POST | `/api/users` | `{name, email, role, desk_id?}` | 201 and the user. `name` 1 to 100 characters (trimmed), `email` valid and at most 254, `role` is `admin`, `worker` or `maintenance_worker` |
+| POST | `/api/users` | `{name, email, role, desk_id?}` | 201 and the user. `desk_id` missing or `null` means no desk. `name` 1 to 100 characters (trimmed), `email` valid and at most 254, `role` is `admin`, `worker` or `maintenance_worker` |
 | PATCH | `/api/users/:user_id` | `{role?, desk_id?}` | 200 and the user. `desk_id: null` unassigns, a uuid moves the user to that (free) desk. Other keys are a 400 |
 | DELETE | `/api/users/:user_id` | | 204. Frees the desk and deletes the user's `routines`, `presets` and `health` rows |
 
