@@ -22,7 +22,7 @@ app.use(express.json()); // lets us read JSON sent in requests
 app.get('/api/health', async (_req, res) => {
   const [db, simulatorError] = await Promise.all([
     checkDb().catch((err) => {
-      console.error(`Database check failed: ${err.message}`);
+      console.error(`Database check failed: ${err.message || err.code}`); // connection refused has an empty message
       return 'error';
     }),
     listDeskIds().then(() => null, (err) => err),

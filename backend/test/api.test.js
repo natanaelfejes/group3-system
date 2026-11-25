@@ -254,6 +254,16 @@ test('simulator down is 503 on health and on desks, key nowhere', async () => {
   assert.ok(!server.out.includes(KEY), 'key found in the server logs');
 });
 
+test('only a real local host skips TLS (tricks in the URL count as remote)', async () => {
+  const { isLocalUrl } = await import('../src/db.js');
+  for (const url of ['postgresql://u:p@localhost:5432/db', 'postgresql://localhost/db', 'postgresql://u:p@127.0.0.1:5432/db', 'postgresql://u:p@LOCALHOST/db', 'postgresql://u:p@[::1]:5432/db']) {
+    assert.equal(isLocalUrl(url), true, url);
+  }
+  for (const url of ['postgresql://u:p@evil.com/@localhost/', 'postgresql://u:p@evil.com/db?host=@localhost/', 'postgresql://u:p@localhost.evil.com/db', 'postgresql://u:p@127.0.0.1.evil.com/db', 'postgresql://u:p@localhost/db?host=evil.com', 'postgresql://u:p@db.supabase.co:5432/postgres', 'not a url', '']) {
+    assert.equal(isLocalUrl(url), false, url);
+  }
+});
+
 test('server refuses to start without SIMULATOR_API_KEY', async () => {
   await assert.rejects(startApi('http://127.0.0.1:1', { SIMULATOR_API_KEY: '' }), /SIMULATOR_API_KEY is missing/);
 });

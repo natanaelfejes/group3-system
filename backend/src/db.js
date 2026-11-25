@@ -8,7 +8,17 @@ const { DATABASE_URL } = process.env;
 // Remote databases use TLS. The certificate is not checked yet because Supabase signs it with
 // its own CA, which Node doesn't know. That stops sniffing but not a man-in-the-middle.
 // TODO: add Supabase's CA file and turn the check on.
-const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])([:/?]|$)/.test(DATABASE_URL ?? '');
+// A database on this computer (tests) has no TLS. A URL we can't read, or one with ?host= (pg would
+// use that host instead), counts as remote.
+export function isLocalUrl(url) {
+  try {
+    const u = new URL(url);
+    return ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname.toLowerCase()) && !u.searchParams.has('host');
+  } catch {
+    return false;
+  }
+}
+const isLocal = isLocalUrl(DATABASE_URL ?? '');
 
 export const pool = DATABASE_URL
   ? new pg.Pool({
