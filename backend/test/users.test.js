@@ -241,7 +241,7 @@ dbTest('POST without a JSON content type is 400', async () => {
 dbTest('SQL-injection-looking name and email are stored literally', async () => {
   await reset();
   const name = "Robert'); DROP TABLE users;--";
-  const email = "x'||(select 1)--@evil.dk";
+  const email = "x'||(select/**/1)--@evil.dk"; // no spaces: an email can't have any
   const res = await post({ name, email, role: 'worker' });
   assert.equal(res.status, 201);
   const u = await res.json();
