@@ -3,6 +3,7 @@ import { clearUser, loadUser, login, saveUser, type Role, type User } from './au
 import { Layout } from './components/Layout.tsx'
 import { pagesFor } from './navigation.ts'
 import { LoginPage } from './pages/LoginPage.tsx'
+import {Route, Routes} from "react-router";
 
 function App() {
   const [user, setUser] = useState<User | null>(loadUser)
@@ -14,22 +15,6 @@ function App() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-
-
-  //========== Maybe to be deleted
-  function matchRoute(routePath: string, currentPath: string) {
-    const routeParts = routePath.split('/')
-    const pathParts = currentPath.split('/')
-
-    if (routeParts.length !== pathParts.length) {
-      return false
-    }
-
-    return routeParts.every((part, index) => {
-      return part.startsWith(':') || part === pathParts[index]
-    })
-  }
-// ==========
 
   const pages = user ? pagesFor(user.role) : []
   // If the URL doesn't exist, or this role isn't allowed on that page, we just show the dashboard instead
@@ -63,9 +48,21 @@ function App() {
   if (!user || !page) return <LoginPage onLogin={handleLogin} />
 
   return (
+      <>
+
     <Layout user={user} pages={pages} currentPath={page.path} onNavigate={navigate} onLogout={handleLogout}>
-      <page.Component user={user} />
+      <Routes>
+        {pages.length != 0 ? pages.map((page) => {
+          if(page.isIndex) {
+            return (<Route index path={page.path} Component={page.Component}/>);
+          }
+
+          return (<Route path={page.path} Component={page.Component}/>)
+        }) : <></>
+        }
+      </Routes>
     </Layout>
+      </>
   )
 }
 

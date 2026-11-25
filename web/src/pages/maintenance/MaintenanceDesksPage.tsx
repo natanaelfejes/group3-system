@@ -4,10 +4,12 @@ import {StatusTile} from "../../components/StatusTile.tsx";
 import {Section} from "../../components/Section.tsx";
 import {ListTable} from "../../components/ListTable.tsx";
 import Desk from "../../../Model/Desk.ts"
+import {useNavigate} from "react-router";
 
 // This is the Desks page maintenance sees
 export function MaintenanceDesksPage() {
 
+    const navigate = useNavigate();
 
     //=== Just for testing purposes of the UI. Remove later =====
     const [allDesksCategories, setAllDesksCategories] = useState<Map<string, number>>(new Map<string, number>());
@@ -54,7 +56,16 @@ export function MaintenanceDesksPage() {
     }, []);
 
     //===============
+    // Has to be defines like that, so the needed parameters can be passed downthe component tree.
+    function toggleDeskAction(item: Desk) {
 
+        const link: string = "/desk/" + item.Id;
+        return (
+            <button onClick={() => navigate(link)} type="button" className="inline-flex h-[60px] w-[123px] items-center justify-center gap-2 rounded-[9px]  font-medium transition-colors hover:bg-[#d6d6d6] hover:text-[#1A1A1A]">
+                View <span aria-hidden="true">→</span>
+            </button>
+        )
+    }
 
   return (
     <>
@@ -73,9 +84,7 @@ export function MaintenanceDesksPage() {
 
             <Section title="DeskList" className=" md:col-span-2 md:block md:mt-5.5" action={<input id="sit_minutes" name="sit_minutes" type="text" className="input" placeholder="Search desk" />}>
                 <ListTable<Desk> listItems={allDesks} tableHeaders={allDesks.length != 0 ? Object.keys(allDesks[0]): []}
-                                 actionElement={<button onClick={() => console.log("Button trigger")} type="button" className="inline-flex h-[60px] w-[123px] items-center justify-center gap-2 rounded-[9px]  font-medium transition-colors hover:bg-[#d6d6d6] hover:text-[#1A1A1A]">
-                    View <span aria-hidden="true">→</span>
-                    </button>}
+                                 actionElement={toggleDeskAction}
                 />
             </Section>
         </div>

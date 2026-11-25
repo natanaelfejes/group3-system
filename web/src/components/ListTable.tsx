@@ -4,7 +4,7 @@ import type {ReactNode} from "react";
 type ListTableProps<T extends object> = {
     listItems: T[]
     tableHeaders: string[]
-    actionElement?: ReactNode
+    actionElement?: (item: T) => ReactNode;
 
 }
 

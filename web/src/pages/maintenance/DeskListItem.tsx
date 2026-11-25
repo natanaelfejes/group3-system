@@ -3,7 +3,7 @@ import type {ReactNode} from "react";
 type DeskListItemProps<T extends object> = {
     item: T;
     rowIndex: number;
-    action?: ReactNode
+    action?: (item: T) => ReactNode
 }
 export function DeskListItem<T extends object>({item, rowIndex, action}: DeskListItemProps<T>) {
     return(
@@ -14,7 +14,7 @@ export function DeskListItem<T extends object>({item, rowIndex, action}: DeskLis
                 </td>
             ))}
             <td className="border-b ">
-                {action}
+                {action?.(item)}
             </td>
         </tr>
     );
