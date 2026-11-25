@@ -382,7 +382,7 @@ function UserDialog({ user, desks, onClose, onSaved }: { user?: UserWithDesk; de
         </div>
         <div>
           <label className="label" htmlFor="user-email">Work email</label>
-          <input id="user-email" type="email" className="input" required disabled={!!user} placeholder="name@company.dk" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input id="user-email" type="email" className="input" required disabled={!!user} placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div>
           <label className="label" htmlFor="user-role">Role</label>
