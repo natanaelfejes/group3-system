@@ -1,10 +1,12 @@
 // Tests for the user admin endpoints (/api/users, /api/db/desks). Run with: npm test (in backend/)
-// They need a REAL Postgres. Set TEST_DATABASE_URL to a throwaway database, e.g.
-//   docker run -d --rm --name g3-test-pg -e POSTGRES_PASSWORD=x -p 127.0.0.1:55432:5432 postgres:16
-//   TEST_DATABASE_URL=postgresql://postgres:x@127.0.0.1:55432/postgres npm test
-// Without it the database tests are skipped (CI has no Postgres); the gate, "no DATABASE_URL" and
-// "database down" tests need no Postgres and always run. The database tests DROP and re-create the
-// users/desks/presets/routines/health tables, so the URL must point at localhost (checked below).
+// They need a REAL Postgres. Set TEST_DATABASE_URL to a throwaway database on localhost whose name ends
+// in _test (create it first), e.g.
+//   docker run -d --rm --name g3-test-pg -e POSTGRES_PASSWORD=x -e POSTGRES_DB=group3_test -p 127.0.0.1:55432:5432 postgres:16
+//   TEST_DATABASE_URL=postgresql://postgres:x@127.0.0.1:55432/group3_test npm test
+// Without it the database tests are skipped (CI has no Postgres); the gate, "no DATABASE_URL",
+// "database down" and guard tests need no Postgres and always run. The database tests DROP and re-create the
+// users/desks/presets/routines/health tables, so testDbProblem() below refuses anything that is not
+// localhost with a database called *_test (an SSH tunnel to localhost can lead to production).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
@@ -14,6 +16,21 @@ import pg from 'pg';
 const DB_URL = process.env.TEST_DATABASE_URL;
 const SKIP = DB_URL ? false : 'TEST_DATABASE_URL is not set (needs a throwaway Postgres on localhost)';
 const dbTest = (name, fn) => test(name, { skip: SKIP }, fn);
+
+// Why TEST_DATABASE_URL is not safe to wipe, or null if it is. Reads the URL the way pg does
+// (pg-connection-string): ?host= in the query overrides the host in the URL, so new URL() is not enough.
+export function testDbProblem(url) {
+  let client;
+  try {
+    client = new pg.Client({ connectionString: url });
+  } catch {
+    return 'TEST_DATABASE_URL is not a valid connection string';
+  }
+  const { host, database } = client;
+  if (!['localhost', '127.0.0.1', '::1'].includes(host)) return `host is ${host}, it must be localhost, 127.0.0.1 or ::1`;
+  if (!database?.endsWith('_test')) return `database is ${database}, its name must end in _test`;
+  return null;
+}
 
 const D1 = '11111111-1111-4111-8111-111111111111';
 const D2 = '22222222-2222-4222-8222-222222222222';
@@ -98,8 +115,8 @@ async function reset() {
 
 before(async () => {
   if (SKIP) return;
-  const host = new URL(DB_URL).hostname;
-  assert.ok(['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host), `refusing to drop tables on ${host}: TEST_DATABASE_URL must be localhost`);
+  const problem = testDbProblem(DB_URL);
+  if (problem) throw new Error(`refusing to drop tables: ${problem}`);
   db = new pg.Client({ connectionString: DB_URL });
   await db.connect();
   // Sensible definitions for a throwaway database. Production defaults are not known.
@@ -117,6 +134,30 @@ before(async () => {
 after(async () => {
   await Promise.all(children.map((c) => (c.exitCode === null ? new Promise((r) => (c.once('exit', r), c.kill())) : null)));
   await db?.end();
+});
+
+// ===== The guard around the DROP TABLEs =====
+
+test('guard accepts only localhost with a *_test database', () => {
+  assert.equal(testDbProblem('postgresql://u:p@localhost:5432/group3_test'), null);
+  assert.equal(testDbProblem('postgresql://u:p@127.0.0.1:55432/group3_test'), null);
+  assert.equal(testDbProblem('postgresql://u:p@[::1]:5432/x_test'), null);
+});
+
+test('guard refuses other hosts, host tricks and databases not ending in _test', () => {
+  for (const url of [
+    'postgresql://x@localhost/group3_test?host=db.evil.com', // pg connects to db.evil.com
+    'postgresql://x@localhost/group3_test?host=/var/run/postgresql',
+    'postgresql://u:p@localhost.evil.com:5432/group3_test',
+    'postgresql://127.0.0.1@evil.com/group3_test',
+    'postgresql://u:p@db.example.com:5432/group3_test',
+    'postgresql://u:p@localhost:5432/postgres', // a tunnel to production
+    'postgresql://u:p@localhost:5432/group3_test_prod',
+    'postgresql://u:p@localhost:5432/',
+    'not a url',
+  ]) {
+    assert.ok(testDbProblem(url), `should refuse ${url}`);
+  }
 });
 
 // ===== The gate =====

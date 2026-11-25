@@ -46,7 +46,7 @@ Requires Node.js 22.9 or newer.
 
 Each write is one transaction. Errors are JSON `{"error": "..."}`: 400 bad body or uuid (also no `Content-Type: application/json`), 404 user or desk not found, 409 email already used (any letter case) or desk already taken, 503 `Database not configured` or database not reachable.
 
-Tests for it need a throwaway Postgres on localhost and skip without `TEST_DATABASE_URL`, see the top of `test/users.test.js`.
+Tests for it need a throwaway Postgres on localhost and skip without `TEST_DATABASE_URL`, see the top of `test/users.test.js`. They drop and re-create tables, so they refuse any URL whose host is not localhost, 127.0.0.1 or ::1 (as pg reads it, including `?host=`) or whose database name does not end in `_test`. Create that database first, for example `POSTGRES_DB=group3_test` on the throwaway container.
 
 ## Endpoints
 
