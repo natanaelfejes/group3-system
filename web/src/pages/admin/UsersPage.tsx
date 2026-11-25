@@ -305,12 +305,15 @@ function StatTile({ label, value }: { label: string; value: number | string }) {
 function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
+  const leaving = useRef(false) // true when we are closing the window on purpose
 
   useEffect(() => {
     const dialog = ref.current
     const opener = document.activeElement as HTMLElement | null // the button that opened the window
+    leaving.current = false
     dialog?.showModal()
     return () => {
+      leaving.current = true
       dialog?.close()
       opener?.focus() // by now React has already removed the window, so the browser can't give the focus back by itself
     }
@@ -324,6 +327,11 @@ function Dialog({ title, onClose, children }: { title: string; onClose: () => vo
       onCancel={(e) => {
         e.preventDefault() // we close it ourselves, so onClose can say no (for example while saving)
         onClose()
+      }}
+      // Chrome only lets us block Escape once per key press, so a second quick Escape can still close the window.
+      // If that happens while the page still wants it open (for example while saving), we open it again.
+      onClose={(e) => {
+        if (!leaving.current && !e.currentTarget.open) e.currentTarget.showModal()
       }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -349,8 +357,9 @@ function UserDialog({ user, desks, onClose, onSaved }: { user?: UserWithDesk; de
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    // "required" lets a name with only spaces through, so we check the trimmed name ourselves
-    if (!name.trim()) {
+    // "required" lets a name with only spaces through, so we check the trimmed name ourselves.
+    // (When editing, the name is locked, so we leave it alone.)
+    if (!user && !name.trim()) {
       setError('Please enter a full name.')
       return
     }
