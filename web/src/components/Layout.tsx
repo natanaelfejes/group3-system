@@ -7,14 +7,13 @@ type LayoutProps = {
   user: User
   pages: Page[]
   currentPath: string
-  onNavigate: (path: string) => void
   onLogout: () => void
   children: ReactNode
 }
 
 // The header and the menu that are around every page once you're logged in.
 // On a computer the menu is on the left, on a phone it moves to the bottom of the screen.
-export function Layout({ user, pages, currentPath, onNavigate, onLogout, children }: LayoutProps) {
+export function Layout({ user, pages, currentPath, onLogout, children }: LayoutProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
