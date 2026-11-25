@@ -18,17 +18,19 @@ app.use(express.json()); // lets us read JSON sent in requests
 // Checks if the API, the simulator and the database are working.
 // The database does not change the status code: the Pico only needs the simulator.
 // db is "ok", "not configured" (no DATABASE_URL) or "error".
+// Both checks run at the same time so a slow database can't push us past the 5 s Docker healthcheck.
 app.get('/api/health', async (_req, res) => {
-  const db = await checkDb().catch((err) => {
-    console.error(`Database check failed: ${err.message}`);
-    return 'error';
-  });
-  try {
-    await listDeskIds();
-    res.json({ api: 'ok', simulator: 'ok', db });
-  } catch (err) {
-    res.status(503).json({ api: 'ok', simulator: 'error', db, error: err.message });
+  const [db, simulatorError] = await Promise.all([
+    checkDb().catch((err) => {
+      console.error(`Database check failed: ${err.message}`);
+      return 'error';
+    }),
+    listDeskIds().then(() => null, (err) => err),
+  ]);
+  if (simulatorError) {
+    return res.status(503).json({ api: 'ok', simulator: 'error', db, error: simulatorError.message });
   }
+  res.json({ api: 'ok', simulator: 'ok', db });
 });
 
 // All desk endpoints are in routes/desks.js

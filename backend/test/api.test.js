@@ -130,6 +130,24 @@ test('health: db is "error" (and the status stays 200) when DATABASE_URL points 
   assert.ok(!server.out.includes('secretpw123'), 'database password found in the server logs');
 });
 
+test('health: a database that never answers does not hang the request', async () => {
+  const silent = net.createServer(() => {}); // accepts the connection, never replies
+  await new Promise((r) => silent.listen(0, '127.0.0.1', r));
+  try {
+    const server = await startApi(`http://127.0.0.1:${fake.address().port}`, {
+      DATABASE_URL: `postgresql://user:pw@127.0.0.1:${silent.address().port}/postgres`,
+    });
+    const start = Date.now();
+    const res = await fetch(`${server.url}/api/health`);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).db, 'error');
+    assert.ok(Date.now() - start < 4000, 'health took longer than the 5 s Docker healthcheck allows');
+  } finally {
+    silent.close();
+    silent.closeAllConnections?.();
+  }
+});
+
 test('GET /api/desks lists desk ids', async () => {
   assert.deepEqual(await (await call('/api/desks')).json(), [DESK]);
 });
