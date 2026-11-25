@@ -26,16 +26,17 @@ const USER_SQL = `select u.user_id, u.name, u.email, u.role, u.created_at,
 // Runs fn(client) inside one transaction.
 async function tx(fn) {
   const client = await pool.connect();
+  let broken = null;
   try {
     await client.query('begin');
     const result = await fn(client);
     await client.query('commit');
     return result;
   } catch (err) {
-    await client.query('rollback').catch(() => {});
+    await client.query('rollback').catch((rollbackErr) => (broken = rollbackErr));
     throw err;
   } finally {
-    client.release();
+    client.release(broken ?? undefined); // an error here makes the pool drop the connection
   }
 }
 
