@@ -32,7 +32,7 @@ Requires Node.js 22.9 or newer.
 
 ## User admin API (off by default)
 
-`GET/POST /api/users`, `PATCH/DELETE /api/users/:user_id` and `GET /api/db/desks` read and change the `users` and `desks` tables. They are only mounted when `ENABLE_USER_ADMIN_API=1` is set and `DATABASE_URL` works; otherwise they answer the normal JSON 404.
+`GET/POST /api/users`, `PATCH/DELETE /api/users/:user_id` and `GET /api/db/desks` read and change the `users` and `desks` tables. They are only mounted when `ENABLE_USER_ADMIN_API=1` is set; otherwise they answer the normal JSON 404. With the flag on and no database they answer 503 `Database not configured`.
 
 > **Warning:** there is no authentication. nginx exposes `/api/` publicly on the VM, so anyone could create, change or delete users. Enable it only when requests are authenticated (or locally). It is not set in docker-compose or CI on purpose.
 
