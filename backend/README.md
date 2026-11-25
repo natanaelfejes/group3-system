@@ -19,11 +19,16 @@ To work on the backend with auto-restart instead:
    ```
    SIMULATOR_URL=http://localhost:8000
    SIMULATOR_API_KEY=<same key as SIMULATOR_API_KEY in the root .env>
+   DATABASE_URL=<Supabase connection string, optional, see below>
    ```
 3. In `backend/`: `npm install`, then `npm run dev`.
-4. Check http://localhost:3000/api/health. It should show `{"api":"ok","simulator":"ok"}`.
+4. Check http://localhost:3000/api/health. It should show `{"api":"ok","simulator":"ok","db":"ok"}`. `db` is `"not configured"` without `DATABASE_URL` and `"error"` if the database cannot be reached (the status code only depends on the simulator).
 
 Requires Node.js 22.9 or newer.
+
+## Database (Supabase)
+
+`src/db.js` exports a `pg` connection pool built from `DATABASE_URL`. Get the string in the Supabase dashboard: Project > Connect > Session pooler (works over IPv4, the VM needs that). Keep it in `.env` only. Connections to a remote database use TLS, but the certificate is not checked yet (see the TODO in `src/db.js`). Tables (`users`, `desks`, `presets`, ...) are created in Supabase, not by this code.
 
 ## Endpoints
 
@@ -31,7 +36,7 @@ Requires Node.js 22.9 or newer.
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/health` | `{"api":"ok","simulator":"ok"}`, or 503 if the simulator can't be used |
+| GET | `/api/health` | `{"api":"ok","simulator":"ok","db":"ok"}`, or 503 if the simulator can't be used (`db` never changes the status) |
 | GET | `/api/desks` | `["cd:fb:1a:53:fb:e6", "ee:62:5b:b8:73:1d"]`: desks that are powered on |
 | GET | `/api/desks/:deskId` | Everything: `{ id, config, state, usage, lastErrors }` |
 | GET | `/api/desks/:deskId/state` | `{ position_mm, speed_mms, status, isPositionLost, isOverloadProtectionUp, isOverloadProtectionDown, isAntiCollision }` |

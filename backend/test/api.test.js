@@ -116,7 +116,36 @@ after(async () => {
 test('health: ok when the simulator answers', async () => {
   const res = await call('/api/health');
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { api: 'ok', simulator: 'ok' });
+  assert.deepEqual(await res.json(), { api: 'ok', simulator: 'ok', db: 'not configured' });
+});
+
+test('health: db is "error" (and the status stays 200) when DATABASE_URL points nowhere, password not logged', async () => {
+  const dead = await freePort();
+  const server = await startApi(`http://127.0.0.1:${fake.address().port}`, {
+    DATABASE_URL: `postgresql://user:secretpw123@127.0.0.1:${dead}/postgres`,
+  });
+  const res = await fetch(`${server.url}/api/health`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { api: 'ok', simulator: 'ok', db: 'error' });
+  assert.ok(!server.out.includes('secretpw123'), 'database password found in the server logs');
+});
+
+test('health: a database that never answers does not hang the request', async () => {
+  const silent = net.createServer(() => {}); // accepts the connection, never replies
+  await new Promise((r) => silent.listen(0, '127.0.0.1', r));
+  try {
+    const server = await startApi(`http://127.0.0.1:${fake.address().port}`, {
+      DATABASE_URL: `postgresql://user:pw@127.0.0.1:${silent.address().port}/postgres`,
+    });
+    const start = Date.now();
+    const res = await fetch(`${server.url}/api/health`);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).db, 'error');
+    assert.ok(Date.now() - start < 4000, 'health took longer than the 5 s Docker healthcheck allows');
+  } finally {
+    silent.close();
+    silent.closeAllConnections?.();
+  }
 });
 
 test('GET /api/desks lists desk ids', async () => {
@@ -223,6 +252,16 @@ test('simulator down is 503 on health and on desks, key nowhere', async () => {
   assert.ok(!(await health.text()).includes(KEY));
   assert.equal((await fetch(`${server.url}/api/desks`)).status, 503);
   assert.ok(!server.out.includes(KEY), 'key found in the server logs');
+});
+
+test('only a real local host skips TLS (tricks in the URL count as remote)', async () => {
+  const { isLocalUrl } = await import('../src/db.js');
+  for (const url of ['postgresql://u:p@localhost:5432/db', 'postgresql://localhost/db', 'postgresql://u:p@127.0.0.1:5432/db', 'postgresql://u:p@LOCALHOST/db', 'postgresql://u:p@[::1]:5432/db']) {
+    assert.equal(isLocalUrl(url), true, url);
+  }
+  for (const url of ['postgresql://u:p@evil.com/@localhost/', 'postgresql://u:p@evil.com/db?host=@localhost/', 'postgresql://u:p@localhost.evil.com/db', 'postgresql://u:p@127.0.0.1.evil.com/db', 'postgresql://u:p@localhost/db?host=evil.com', 'postgresql://u:p@db.supabase.co:5432/postgres', 'not a url', '']) {
+    assert.equal(isLocalUrl(url), false, url);
+  }
 });
 
 test('server refuses to start without SIMULATOR_API_KEY', async () => {
