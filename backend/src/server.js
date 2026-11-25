@@ -1,6 +1,7 @@
 import express from 'express';
 import { desksRouter } from './routes/desks.js';
 import { listDeskIds, SimulatorError } from './services/deskSimulatorClient.js';
+import { usersRouter } from './routes/users.js';
 import { checkDb } from './db.js';
 
 // ===== Settings (from .env) =====
@@ -35,6 +36,10 @@ app.get('/api/health', async (_req, res) => {
 
 // All desk endpoints are in routes/desks.js
 app.use('/api/desks', desksRouter);
+
+// User admin (/api/users, /api/db/desks): no authentication yet, so it is off unless ENABLE_USER_ADMIN_API=1.
+// Enable it only when requests are authenticated (nginx exposes /api/ publicly).
+if (process.env.ENABLE_USER_ADMIN_API === '1') app.use('/api', usersRouter);
 
 // Any other URL gets a 404
 app.use((_req, res) => {
