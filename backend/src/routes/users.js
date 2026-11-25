@@ -93,12 +93,12 @@ usersRouter.post('/users', async (req, res, next) => {
     if (name.length < 1 || name.length > 100) throw new HttpError(400, 'name must be 1 to 100 characters');
     if (email.length > 254 || !EMAIL.test(email)) throw new HttpError(400, 'email is not valid');
     checkRole(role);
-    if (desk_id !== undefined && !isUuid(desk_id)) throw new HttpError(400, 'desk_id must be a uuid');
+    if (desk_id != null && !isUuid(desk_id)) throw new HttpError(400, 'desk_id must be a uuid or null');
 
     const user = await tx(async (client) => {
       // One at a time, so two requests can't both pass the email check (we can't see a lower(email) index in production).
       await client.query("select pg_advisory_xact_lock(hashtext('users.email'))");
-      if (desk_id !== undefined) await lockFreeDesk(client, desk_id.toLowerCase());
+      if (desk_id != null) await lockFreeDesk(client, desk_id.toLowerCase());
       const dup = await client.query('select 1 from users where lower(email) = lower($1)', [email]);
       if (dup.rows.length) throw new HttpError(409, 'Email already exists');
       const { rows } = await client.query(
@@ -106,7 +106,7 @@ usersRouter.post('/users', async (req, res, next) => {
         [name, email, role],
       );
       const userId = rows[0].user_id;
-      if (desk_id !== undefined) await client.query('update desks set user_id = $1 where desk_id = $2', [userId, desk_id.toLowerCase()]);
+      if (desk_id != null) await client.query('update desks set user_id = $1 where desk_id = $2', [userId, desk_id.toLowerCase()]);
       return getUser(client, userId);
     });
     res.status(201).json(user);

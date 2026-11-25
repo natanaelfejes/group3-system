@@ -221,6 +221,13 @@ dbTest('POST creates a user (201), trims the name, assigns the desk', async () =
   assert.equal(await deskOwner(D1), u.user_id);
 });
 
+dbTest('POST with desk_id null is the same as no desk (201)', async () => {
+  await reset();
+  const res = await post({ name: 'Amy', email: 'amy@x.dk', role: 'worker', desk_id: null });
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).desk_id, null);
+});
+
 dbTest('POST without a desk gives desk_id null', async () => {
   await reset();
   const res = await post({ name: 'Amy', email: 'amy@x.dk', role: 'admin' });
@@ -261,7 +268,6 @@ dbTest('POST: bad name, email, role or desk_id is 400 and nothing is stored', as
     { ...ok, role: 'Admin' },
     { ...ok, role: undefined },
     { ...ok, desk_id: 'not-a-uuid' },
-    { ...ok, desk_id: null },
     [],
   ];
   for (const body of bad) assert.equal((await post(body)).status, 400, JSON.stringify(body));
