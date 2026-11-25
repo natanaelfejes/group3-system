@@ -69,7 +69,7 @@ usersRouter.use(['/users', '/db/desks'], (_req, _res, next) => {
 
 usersRouter.get('/users', async (_req, res, next) => {
   try {
-    res.json((await pool.query(`${USER_SQL} order by u.name, u.created_at`)).rows);
+    res.json((await pool.query(`${USER_SQL} order by u.name, u.created_at limit 500`)).rows);
   } catch (err) {
     next(err);
   }
