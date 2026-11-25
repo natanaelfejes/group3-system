@@ -44,7 +44,7 @@ Requires Node.js 22.9 or newer.
 | PATCH | `/api/users/:user_id` | `{role?, desk_id?}` | 200 and the user. `desk_id: null` unassigns, a uuid moves the user to that (free) desk. Other keys are a 400 |
 | DELETE | `/api/users/:user_id` | | 204. Frees the desk and deletes the user's `routines`, `presets` and `health` rows |
 
-Each write is one transaction. Errors are JSON `{"error": "..."}`: 400 bad body or uuid (also no `Content-Type: application/json`), 404 user or desk not found, 409 email already used (any letter case) or desk already taken, 503 `Database not configured` or database not reachable.
+Each write is one transaction. Errors are JSON `{"error": "..."}`: 400 bad body or uuid (also no `Content-Type: application/json`), 404 user not found, 409 email already used (any letter case) or desk already taken, 422 desk from the body not found (not 404, the web app reads every 404 as "API not available"), 503 `Database not configured` or database not reachable.
 
 Tests for it need a throwaway Postgres on localhost and skip without `TEST_DATABASE_URL`, see the top of `test/users.test.js`. They drop and re-create tables, so they refuse any URL whose host is not localhost, 127.0.0.1 or ::1 (as pg reads it, including `?host=`) or whose database name does not end in `_test`. Create that database first, for example `POSTGRES_DB=group3_test` on the throwaway container.
 

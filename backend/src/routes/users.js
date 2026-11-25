@@ -42,10 +42,10 @@ async function tx(fn) {
 
 const getUser = async (client, userId) => (await client.query(`${USER_SQL} where u.user_id = $1`, [userId])).rows[0];
 
-// Locks the desk row. 404 if it doesn't exist, 409 if somebody other than userId has it.
+// Locks the desk row. 422 if it doesn't exist (not 404: the web app reads every 404 as "API not available"), 409 if somebody other than userId has it.
 async function lockFreeDesk(client, deskId, userId = null) {
   const { rows } = await client.query('select user_id from desks where desk_id = $1 for update', [deskId]);
-  if (!rows.length) throw new HttpError(404, 'Desk not found');
+  if (!rows.length) throw new HttpError(422, 'Desk not found');
   if (rows[0].user_id && rows[0].user_id !== userId) throw new HttpError(409, 'Desk is already taken');
 }
 

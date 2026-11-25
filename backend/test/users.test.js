@@ -244,11 +244,11 @@ dbTest('POST: duplicate email in a different case is 409, only one row stays', a
   assert.equal((await q('select * from users')).length, 1);
 });
 
-dbTest('POST: a taken desk is 409 and no user is created; a missing desk is 404', async () => {
+dbTest('POST: a taken desk is 409 and no user is created; a missing desk is 422', async () => {
   await reset();
   await addUser('Amy', 'amy@x.dk', 'worker', D1);
   assert.equal((await post({ name: 'Bob', email: 'bob@x.dk', role: 'worker', desk_id: D1 })).status, 409);
-  assert.equal((await post({ name: 'Bob', email: 'bob@x.dk', role: 'worker', desk_id: MISSING })).status, 404);
+  assert.equal((await post({ name: 'Bob', email: 'bob@x.dk', role: 'worker', desk_id: MISSING })).status, 422);
   assert.equal((await q('select * from users')).length, 1);
 });
 
@@ -348,11 +348,11 @@ dbTest('PATCH: desk of somebody else is 409 and nothing changes (the old desk is
   assert.equal((await q('select role from users where user_id = $1', [id]))[0].role, 'worker');
 });
 
-dbTest('PATCH: 404 for a missing user or desk, 400 for bad bodies and ids', async () => {
+dbTest('PATCH: 404 for a missing user, 422 for a missing desk, 400 for bad bodies and ids', async () => {
   await reset();
   const id = await addUser('Amy', 'amy@x.dk', 'worker', D1);
   assert.equal((await patch(MISSING, { role: 'admin' })).status, 404);
-  assert.equal((await patch(id, { desk_id: MISSING })).status, 404);
+  assert.equal((await patch(id, { desk_id: MISSING })).status, 422);
   assert.equal(await deskOwner(D1), id); // the failed move did not free the old desk
   for (const body of [{}, { role: 'boss' }, { role: null }, { desk_id: 'x' }, { desk_id: 5 }, { name: 'New' }, { role: 'admin', email: 'a@b.dk' }, []]) {
     assert.equal((await patch(id, body)).status, 400, JSON.stringify(body));
