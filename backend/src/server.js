@@ -6,6 +6,7 @@ import {parseCookieHeader} from "@supabase/ssr";
 import {AuthenticatorService} from "./services/authenticatorService.js";
 import * as simulator from "./services/deskSimulatorClient.js";
 import {config} from "./config/var.js";
+import {authRouter} from "./routes/auth.js";
 
 
 const app = express();
@@ -18,7 +19,13 @@ app.use(cors({
 }));
 
 app.use(express.json()); // lets us read JSON sent in requests
+app.use((req, res, next) => {
+  const authService = new AuthenticatorService(config.supaBase.publishableKey, config.supaBase.url);
+  req.supabase = authService.getClient(req, res);
+  console.log("Supabase must have been added to the req.")
 
+  next();
+})
 // ===== Routes =====
 
 // Checks if the API and the simulator are both working
@@ -33,17 +40,12 @@ app.get('/api/health', async (_req, res) => {
 
 // All desk endpoints are in routes/desks.js
 app.use('/api/desks', desksRouter);
+app.use("/api/", authRouter);
 
 // Any other URL gets a 404
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
-
-app.use((req, res, next) => {
-  const authService = new AuthenticatorService(config.supabase.publishableKey, config.supabase.url);
-  req.supabse = authService.getClient(req, res);
-
-})
 
 // ===== Error handling =====
 // IMPORTANT: every error thrown in the routes ends up here.

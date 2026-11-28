@@ -1,6 +1,7 @@
 import {createClient} from "@supabase/supabase-js";
 import {createServerClient, parseCookieHeader, serializeCookieHeader} from "@supabase/ssr";
 import cookies from "express/lib/application.js";
+import {config} from "../config/var.js";
 
 export class AuthenticatorService {
 
@@ -12,7 +13,12 @@ export class AuthenticatorService {
     }
 
      getClient(req, res) {
-        try {
+        console.log("Initialising Get client in AuthenticationService class.");
+            const cookies = new Map(
+                parseCookieHeader(req.headers.cookie ?? '')
+                    .map(({ name, value }) => [name, value])
+            );
+
             return  createServerClient(
                 this.URL,
                 this.API_KEY,
@@ -20,16 +26,18 @@ export class AuthenticatorService {
                     cookieOptions: {
                         path: '/',
                         sameSite: 'lax',
-                        secure: isProduction,
+                        secure: config.env.isProduction,
                         httpOnly: true
                     },
                     cookies: {
                         getAll() {
-                            let parsedHeaders = parseCookieHeader(req.headers.get('Cookie'));
+                            let parsedHeaders = parseCookieHeader(req.get('Cookie') ?? "");
 
                             return parsedHeaders.map((value) => {
-                                value.name
-                                value.value
+                              return {
+                                  name: value.name,
+                                  value: value.value
+                              }
                             });
                         },
 
@@ -44,7 +52,7 @@ export class AuthenticatorService {
                                         ...options,
                                         path: '/',
                                         sameSite: 'lax',
-                                        secure: isProduction,
+                                        secure: config.env.isProduction,
                                         httpOnly: true
                                     }
                                 ));
@@ -57,11 +65,5 @@ export class AuthenticatorService {
                     }
                 }
             );
-
-
-        } catch (e) {
-            console.error("Error initialising supabase authentication client", e);
-            return null;
-        }
     }
 }

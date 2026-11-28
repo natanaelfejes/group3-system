@@ -10,6 +10,7 @@ export const authRouter = Router();
 authRouter.get("/auth/google", async (req, res) => {
     const currentUrl = urlNoPath(req);
 
+    console.log(req.supabase);
     const supabase = req.supabase;
 
     const {data, error} = await supabase.auth.signInWithOAuth({
@@ -19,12 +20,14 @@ authRouter.get("/auth/google", async (req, res) => {
         }
     })
 
-    if(error) {
+    if(error || !data?.url) {
         const currentFullUrl = fullUrl(req);
         console.error(`Error authenticating in ${currentFullUrl}: ${error}`);
 
         return res.status(500).json({error: "Failed to authenticate."})
     }
+
+    return res.redirect(data.url);
 })
 
 authRouter.get("/auth/callback", async (req, res) => {
@@ -60,7 +63,7 @@ export async function requireAuth(req, res, next) {
     }
 }
 
-app.post('/auth/logout', requireAuth, async (req, res) => {
+authRouter.post('/auth/logout', requireAuth, async (req, res) => {
     const { error } = await req.supabase.auth.signOut({
         scope: 'local'
     });
@@ -70,4 +73,14 @@ app.post('/auth/logout', requireAuth, async (req, res) => {
     }
 
     return res.json({ message: 'Logged out successfully' });
+});
+
+authRouter.get('/auth/me', requireAuth, (req, res) => {
+
+    res.setHeader('Cache-Control', 'private, no-store');
+
+    return res.json({
+        id: req.user.sub,
+        email: req.user.email
+    });
 });

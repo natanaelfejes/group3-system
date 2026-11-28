@@ -10,8 +10,11 @@ export const config = Object.freeze({
         url: process.env.WEB_CLIENT_URL,
     },
 
-    supabase: {
+    supaBase: {
         url: process.env.SUPABASE_URL,
         publishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
     },
+    env: {
+        isProduction: process.env.PRODUCTION,
+    }
 });
