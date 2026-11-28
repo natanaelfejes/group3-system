@@ -87,6 +87,7 @@ The Pico calls the deployed backend through port 80: `http://4.233.89.145/api/..
 | `src/services/deskSimulatorClient.js` | One function per simulator call: `listDeskIds`, `getDesk`, `getDeskState`, `getDeskConfig`, `getDeskUsage`, `getDeskErrors`, `setDeskPosition`. Import these from any backend code that needs desks. |
 | `src/routes/desks.js` | The `/api/desks` endpoints |
 | `src/routes/users.js` | The user admin endpoints (only when `ENABLE_USER_ADMIN_API=1`) |
+| `src/repositories/*.js` | One file per database table (`users`, `desks`, `presets`, `routines`, `health`, `errors`) with plain functions to read and write it, e.g. `getPresetsByUser(userId)`, `createRoutine({...})`, `setActiveRoutine(routineId)`. Each takes the database as an optional last argument (default: the pool from `db.js`). They throw the pg error when a database rule is broken (e.g. `23505` duplicate). Not used by any route yet. Tested in `test/repositories.test.js` against `test/schema.sql`, a copy of the real Supabase tables: keep it in sync when a table changes. |
 | `src/server.js` | Entry point: Express app, `/api/health`, turns errors into HTTP status codes |
 
 Simulator quirks the client already handles:
