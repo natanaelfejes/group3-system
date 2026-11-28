@@ -19,8 +19,6 @@ function App() {
   const pages = user ? pagesFor(user.role) : []
   // If the URL doesn't exist, or this role isn't allowed on that page, we just show the dashboard instead
   const page = pages.find((p) => p.path === path) ?? pages[0]
-  //const page = pages.find((p) => matchRoute(p.path, path)) ?? pages[0]
-  const shownPath = page ? page.path : '/login'
 
   // TODO - To be altered later
   async function handleLogin(role: Role) {

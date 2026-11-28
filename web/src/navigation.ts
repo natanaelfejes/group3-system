@@ -11,7 +11,7 @@ import {MaintenanceDeskPage} from "./pages/maintenance/MaintenanceDeskPage.tsx";
 
 // Every page gets the logged-in user, so it knows whose data to load
 export type PageProps = { user: User }
-type PageComponent = Route<PageProps>
+type PageComponent = any
 
 // The list of all pages. The menu is made from this list (in this order),
 // and it also decides which role can open which page.
